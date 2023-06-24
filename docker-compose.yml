@@ -1,0 +1,12 @@
+version: "3.8"
+services:  
+  mariadb:
+    image: mariadb:10.4
+    container_name: "mariadb-agro"
+    volumes:
+      - .docker/database:/var/lib/mysql
+    ports:
+      - 127.0.0.1:3306:3306
+    environment:
+      MYSQL_PASSWORD: agro
+      MYSQL_ROOT_PASSWORD: agro
