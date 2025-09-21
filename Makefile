@@ -28,3 +28,7 @@ install:
 
 migrate:
 	docker exec -it ${CONTAINER_PHP} sh -c "php artisan migrate"
+
+import:
+	clear && \
+	docker exec -it ${CONTAINER_PHP} sh -c "php artisan import:agrofit"
