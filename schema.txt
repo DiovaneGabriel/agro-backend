@@ -1,0 +1,112 @@
+chemical_groups
+	id
+	name
+
+active_ingredients
+	id
+	name
+	chemical_group_id
+
+classes
+	id
+	name
+
+action_mechanisms
+	id
+	name
+
+action_modes
+	id
+	description
+
+cultures
+	id
+	name
+
+pragues
+	id
+	scientific_name
+
+prague_common_names
+	id
+	prague_id
+	name
+
+countries
+	id
+	name
+
+companies
+	id
+	name
+	country_id
+
+company_types
+	id
+	name
+
+formulations
+	id
+	description
+
+registration_holders
+	id
+	name
+
+toxicological_classes
+	id
+	name
+
+environmental_classes
+	id
+	name
+
+products
+	id
+	is_active
+	is_organic
+	register_number
+	formulation_id
+	concentration
+	registration_holder_id
+	toxicological_class_id
+	environmental_class_id
+	HRAC --Herbicide Resistance Action Committee
+	WSSA --Weed Science Society of America
+
+product_brands
+	id
+	product_id
+	name
+
+product_active_ingredients
+	id
+	product_id
+	active_ingredient_id
+	
+product_classes
+	id
+	product_id
+	class_id
+	action_mechanism_id
+
+product_action_modes
+	id
+	product_id
+	action_mode_id
+
+product_cultures
+	id
+	product_id
+	culture_id
+
+product_pragues
+	id
+	product_id
+	prague_id
+
+product_companies
+	id
+	product_id
+	company_id
+	company_type_id
