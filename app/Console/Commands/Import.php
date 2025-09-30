@@ -2,9 +2,32 @@
 
 namespace App\Console\Commands;
 
+use App\Models\ActionMode;
+use App\Models\ActiveIngredient;
+use App\Models\AgroClass;
+use App\Models\ChemicalGroup;
+use App\Models\Company;
+use App\Models\CompanyType;
+use App\Models\Country;
+use App\Models\Culture;
+use App\Models\EnvironmentalClass;
+use App\Models\Formulation;
+use App\Models\Prague;
+use App\Models\PragueCommonName;
+use App\Models\Product;
+use App\Models\ProductActionMode;
+use App\Models\ProductActiveIngredient;
+use App\Models\ProductBrand;
+use App\Models\ProductClass;
+use App\Models\ProductCompany;
+use App\Models\ProductCulture;
+use App\Models\ProductPrague;
+use App\Models\RegistrationHolder;
+use App\Models\ToxicologicalClass;
 use Exception;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class Import extends Command
 {
@@ -62,36 +85,236 @@ class Import extends Command
                         throw new \RuntimeException('Falha ao combinar header com a linha (array_combine retornou false).');
                     }
 
-                    $item = array_map(fn($v) => $v === null ? null : mb_convert_encoding($v, 'UTF-8', 'UTF-8, ISO-8859-1, Windows-1252'), $item);
+                    $item = array_values($item);
 
+                    $formulationDescription = self::normalize($item[2]);
+                    $formulation = Formulation::whereRaw("lower(description) = ?", strtolower($formulationDescription))->firstOrNew();
+                    $formulation->description = $formulationDescription;
+                    $formulation->save();
 
-                    $this->info(implode(";", $item));
-                    die();
+                    $registrationHolderName = self::normalize($item[4]);
+                    $registrationHolder = RegistrationHolder::whereRaw("lower(name) = ?", strtolower($registrationHolderName))->firstOrNew();
+                    $registrationHolder->name = $registrationHolderName;
+                    $registrationHolder->save();
 
-                    // TODO: processe a linha ($item é associativo)
-                    // ex.: Product::create($item);
+                    $toxicologicalClassName = self::normalize($item[11]);
+                    $toxicologicalClass = ToxicologicalClass::whereRaw("lower(name) = ?", strtolower($toxicologicalClassName))->firstOrNew();
+                    $toxicologicalClass->name = $toxicologicalClassName;
+                    $toxicologicalClass->save();
 
+                    $environmentalClassName = self::normalize($item[12]);
+                    $environmentalClass = EnvironmentalClass::whereRaw("lower(name) = ?", strtolower($environmentalClassName))->firstOrNew();
+                    $environmentalClass->name = $environmentalClassName;
+                    $environmentalClass->save();
+
+                    $id = $item[15];
+                    $isOrganic = self::normalize($item[13]) != 'NÃO' ? true : false;
+                    $isActive = self::normalize($item[14]) != 'TRUE' ? false : true;
+                    $registerNumber = self::normalize($item[0]);
+
+                    $product = Product::whereId($id)->firstOrNew();
+                    $product->id = $id;
+                    $product->is_active = $isActive;
+                    $product->is_organic = $isOrganic;
+                    $product->register_number = $registerNumber;
+                    $product->formulation_id = $formulation->id;
+                    $product->registration_holder_id = $registrationHolder->id;
+                    $product->toxicological_class_id = $toxicologicalClass->id;
+                    $product->environmental_class_id = $environmentalClass->id;
+                    // $product->HRAC
+                    // $product->WSSA
+                    $product->save();
+
+                    # brands
+                    foreach (self::toArray($item[1]) as $value) {
+                        if ($value) {
+                            $row = ProductBrand::where("product_id", $product->id)
+                                ->whereRaw("lower(name) = ?", strtolower($value))
+                                ->first();
+
+                            if (!$row) {
+                                $row = new ProductBrand();
+                                $row->product_id = $product->id;
+                                $row->name = $value;
+                                $row->save();
+                            }
+                        }
+                    }
+
+                    # active ingredients
+                    foreach (self::toArray($item[3]) as $row) {
+                        $row = explode("(", $row);
+
+                        $chemicalGroupName = self::normalize(str_replace(")", "", $row[1]));
+                        if ($chemicalGroupName) {
+                            $chemicalGroup = ChemicalGroup::whereRaw("lower(name) = ?", strtolower($chemicalGroupName))->first();
+                            if (!$chemicalGroup) {
+                                $chemicalGroup = new ChemicalGroup();
+                                $chemicalGroup->name = Str::title($chemicalGroupName);
+                                $chemicalGroup->save();
+                            }
+                        }
+
+                        $activeIngredientName = self::normalize(str_replace(")", "", $row[0]));
+                        if ($activeIngredientName) {
+                            $activeIngredient = ActiveIngredient::whereRaw("lower(name) = ?", strtolower($activeIngredientName))->first();
+                            if (!$activeIngredient) {
+                                $activeIngredient = new ActiveIngredient();
+                                $activeIngredient->name = Str::title($activeIngredientName);
+                                $activeIngredient->chemical_group_id = $chemicalGroup->id;
+                                $activeIngredient->save();
+                            }
+                        }
+
+                        $productActiveIngredient = ProductActiveIngredient::where("product_id", $product->id)
+                            ->where("active_ingredient_id", $activeIngredient->id)
+                            ->first();
+
+                        if (!$productActiveIngredient) {
+                            $productActiveIngredient = new ProductActiveIngredient();
+                            $productActiveIngredient->product_id = $product->id;
+                            $productActiveIngredient->active_ingredient_id = $activeIngredient->id;
+                            $productActiveIngredient->concentration = self::normalize(str_replace(")", "", $row[2]));
+                            $productActiveIngredient->save();
+                        }
+                    }
+
+                    # classes
+                    foreach (self::toArray($item[5]) as $value) {
+                        if ($value) {
+                            $agroClass = AgroClass::whereRaw("lower(name) = ?", strtolower($value))->firstOrNew();
+                            $agroClass->name = $value;
+                            $agroClass->save();
+
+                            $productClass = ProductClass::where("product_id", $product->id)
+                                ->where("class_id", $agroClass->id)
+                                ->first();
+                            if (!$productClass) {
+                                $productClass = new ProductClass();
+                                $productClass->product_id = $product->id;
+                                $productClass->class_id = $agroClass->id;
+                                $productClass->save();
+                            }
+                        }
+                    }
+
+                    # action modes
+                    foreach (self::toArray($item[6]) as $value) {
+                        if ($value) {
+                            $actionMode = ActionMode::whereRaw("lower(description) = ?", strtolower($value))->firstOrNew();
+                            $actionMode->description = $value;
+                            $actionMode->save();
+
+                            $productActionMode = ProductActionMode::where("product_id", $product->id)
+                                ->where("action_mode_id", $actionMode->id)
+                                ->first();
+                            if (!$productActionMode) {
+                                $productActionMode = new ProductActionMode();
+                                $productActionMode->product_id = $product->id;
+                                $productActionMode->action_mode_id = $actionMode->id;
+                                $productActionMode->save();
+                            }
+                        }
+                    }
+
+                    # cultures
+                    // TODO: todas as culturas
+                    foreach (self::toArray($item[7]) as $value) {
+                        if ($value) {
+                            $culture = Culture::whereRaw("lower(name) = ?", strtolower($value))->firstOrNew();
+                            $culture->name = $value;
+                            $culture->save();
+
+                            $productCulture = ProductCulture::where("product_id", $product->id)
+                                ->where("culture_id", $culture->id)
+                                ->first();
+                            if (!$productCulture) {
+                                $productCulture = new ProductCulture();
+                                $productCulture->product_id = $product->id;
+                                $productCulture->culture_id = $culture->id;
+                                $productCulture->save();
+                            }
+                        }
+                    }
+
+                    # pragues
+                    $pragueName = self::normalize($item[8]);
+                    if ($pragueName) {
+                        $prague = Prague::whereRaw("lower(scientific_name) = ?", strtolower($pragueName))->firstOrNew();
+                        $prague->scientific_name = $pragueName;
+                        $prague->save();
+
+                        $productPrague = ProductPrague::where("product_id", $product->id)
+                            ->where("prague_id", $prague->id)
+                            ->first();
+
+                        if (!$productPrague) {
+                            $productPrague = new ProductPrague();
+                            $productPrague->product_id = $product->id;
+                            $productPrague->prague_id = $prague->id;
+                            $productPrague->save();
+                        }
+
+                        foreach (self::toArray($item[9]) as $value) {
+                            if ($value) {
+                                $commomName = PragueCommonName::where("prague_id", $prague->id)
+                                    ->whereRaw("lower(name) = ?", strtolower($value))
+                                    ->first();
+
+                                if (!$commomName) {
+                                    $commomName = new PragueCommonName();
+                                    $commomName->prague_id = $prague->id;
+                                    $commomName->name = $value;
+                                    $commomName->save();
+                                }
+                            }
+                        }
+                    }
+
+                    # companies
+                    foreach (self::toArray($item[10], ["+"]) as $value) {
+                        $value = str_replace("<", "+", $value);
+                        $value = str_replace(">", "+", $value);
+                        $value = explode("+", $value);
+
+                        $countryName = trim($value[1]);
+                        if ($countryName) {
+                            $country = Country::whereRaw("lower(name) = ?", strtolower($countryName))->firstOrNew();
+                            $country->name = $countryName;
+                            $country->save();
+
+                            $companyName = trim(str_replace("(", "", $value[0]));
+                            if ($companyName) {
+                                $company = Company::whereRaw("lower(name) = ?", strtolower($companyName))->firstOrNew();
+                                $company->name = $companyName;
+                                $company->country_id = $country->id;
+                                $company->save();
+
+                                $typeName = trim(str_replace(")", "", $value[2]));
+                                $companyType = CompanyType::whereRaw("lower(name) = ?", $typeName)->firstOrNew();
+                                $companyType->name = $typeName;
+                                $companyType->save();
+
+                                $productCompany = ProductCompany::where("product_id", $product->id)
+                                    ->where("company_id", $company->id)
+                                    ->firstOrNew();
+                                $productCompany->product_id = $product->id;
+                                $productCompany->company_id = $company->id;
+                                $productCompany->company_type_id = $companyType->id;
+                                $productCompany->save();
+                            }
+                        }
+                    }
+
+                    // $this->info(var_dump($item));
+                    // die();
                 } catch (\Throwable $e) {
-                    // Conteúdo bruto da linha, útil para depurar
                     $raw = implode($delimiter, array_map(
                         fn($v) => is_null($v) ? '' : (string) $v,
                         $row
                     ));
 
                     $msg = "Erro na linha {$line}: {$e->getMessage()} | Conteúdo: {$raw}";
-                    // $this->error($msg);
-
-                    // // Log estruturado
-                    // Log::error('Import CSV error', [
-                    //     'file'      => $path,
-                    //     'line'      => $line,
-                    //     'error'     => $e->getMessage(),
-                    //     'row_array' => $row,
-                    //     'raw'       => $raw,
-                    // ]);
-
-                    // Continue importando as próximas linhas
-                    // continue;
                     throw new Exception($msg);
                 }
             }
@@ -103,6 +326,28 @@ class Import extends Command
 
         $this->info('✅ Migração dos dados finalizada.');
         return 0;
+    }
+
+    private static function normalize($value)
+    {
+        $value = mb_convert_encoding($value, 'UTF-8', 'UTF-8, ISO-8859-1, Windows-1252');
+        $value = str_replace(".", "", $value);
+        $value = trim($value);
+        // $value = Str::title($value);
+
+        return $value;
+    }
+
+    private static function toArray($value, array $separators = [" e ", ", ", "/", ";"])
+    {
+        foreach ($separators as $separator) {
+            $value = str_replace($separator, "+", $value);
+        }
+
+        $array = explode("+", $value);
+        $array = array_map(fn($v) => self::normalize($v), $array);
+
+        return $array;
     }
 
     private function unzip()

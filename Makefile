@@ -29,6 +29,10 @@ install:
 migrate:
 	docker exec -it ${CONTAINER_PHP} sh -c "php artisan migrate"
 
+migrate-undo:
+	clear && \
+	docker exec -it ${CONTAINER_PHP} sh -c "php artisan migrate:reset"
+
 import:
 	clear && \
 	docker exec -it ${CONTAINER_PHP} sh -c "php artisan import:agrofit"

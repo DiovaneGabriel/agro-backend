@@ -67,7 +67,6 @@ products
 	is_organic
 	register_number
 	formulation_id
-	concentration
 	registration_holder_id
 	toxicological_class_id
 	environmental_class_id
@@ -83,6 +82,7 @@ product_active_ingredients
 	id
 	product_id
 	active_ingredient_id
+	concentration
 	
 product_classes
 	id

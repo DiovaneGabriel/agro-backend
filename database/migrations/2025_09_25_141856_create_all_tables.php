@@ -132,8 +132,6 @@ return new class extends Migration {
                 ->cascadeOnUpdate()
                 ->restrictOnDelete();
 
-            $table->string('concentration')->nullable();
-
             $table->foreignId('registration_holder_id')
                 ->nullable()
                 ->constrained('registration_holders')
@@ -188,6 +186,7 @@ return new class extends Migration {
                 ->constrained('active_ingredients')
                 ->cascadeOnUpdate()
                 ->restrictOnDelete();
+            $table->string('concentration')->nullable();
             $table->timestamps();
             $table->unique(['product_id', 'active_ingredient_id'], 'u_prod_ai');
             $table->index(['product_id', 'active_ingredient_id']);
