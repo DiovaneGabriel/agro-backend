@@ -142,7 +142,7 @@ class Import extends Command
                     }
 
                     # active ingredients
-                    foreach (self::toArray($item[3]) as $row) {
+                    foreach (self::toArray($item[3], ["+"]) as $row) {
                         $row = explode("(", $row);
 
                         $chemicalGroupName = self::normalize(str_replace(")", "", $row[1]));
@@ -202,7 +202,7 @@ class Import extends Command
                     foreach (self::toArray($item[6]) as $value) {
                         if ($value) {
                             $actionMode = ActionMode::whereRaw("lower(description) = ?", strtolower($value))->firstOrNew();
-                            $actionMode->description = $value;
+                            $actionMode->description =  Str::title($value);
                             $actionMode->save();
 
                             $productActionMode = ProductActionMode::where("product_id", $product->id)
@@ -277,31 +277,33 @@ class Import extends Command
                         $value = str_replace(">", "+", $value);
                         $value = explode("+", $value);
 
-                        $countryName = trim($value[1]);
-                        if ($countryName) {
-                            $country = Country::whereRaw("lower(name) = ?", strtolower($countryName))->firstOrNew();
-                            $country->name = $countryName;
-                            $country->save();
+                        if (isset($value[1]) && isset($value[2])) {
+                            $countryName = trim($value[1]);
+                            if ($countryName) {
+                                $country = Country::whereRaw("lower(name) = ?", strtolower($countryName))->firstOrNew();
+                                $country->name = $countryName;
+                                $country->save();
 
-                            $companyName = trim(str_replace("(", "", $value[0]));
-                            if ($companyName) {
-                                $company = Company::whereRaw("lower(name) = ?", strtolower($companyName))->firstOrNew();
-                                $company->name = $companyName;
-                                $company->country_id = $country->id;
-                                $company->save();
+                                $companyName = trim(str_replace("(", "", $value[0]));
+                                if ($companyName) {
+                                    $company = Company::whereRaw("lower(name) = ?", strtolower($companyName))->firstOrNew();
+                                    $company->name = $companyName;
+                                    $company->country_id = $country->id;
+                                    $company->save();
 
-                                $typeName = trim(str_replace(")", "", $value[2]));
-                                $companyType = CompanyType::whereRaw("lower(name) = ?", $typeName)->firstOrNew();
-                                $companyType->name = $typeName;
-                                $companyType->save();
+                                    $typeName = trim(str_replace(")", "", $value[2]));
+                                    $companyType = CompanyType::whereRaw("lower(name) = ?", $typeName)->firstOrNew();
+                                    $companyType->name = $typeName;
+                                    $companyType->save();
 
-                                $productCompany = ProductCompany::where("product_id", $product->id)
-                                    ->where("company_id", $company->id)
-                                    ->firstOrNew();
-                                $productCompany->product_id = $product->id;
-                                $productCompany->company_id = $company->id;
-                                $productCompany->company_type_id = $companyType->id;
-                                $productCompany->save();
+                                    $productCompany = ProductCompany::where("product_id", $product->id)
+                                        ->where("company_id", $company->id)
+                                        ->firstOrNew();
+                                    $productCompany->product_id = $product->id;
+                                    $productCompany->company_id = $company->id;
+                                    $productCompany->company_type_id = $companyType->id;
+                                    $productCompany->save();
+                                }
                             }
                         }
                     }
