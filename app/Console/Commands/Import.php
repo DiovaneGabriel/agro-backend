@@ -109,83 +109,9 @@ class Import extends Command
                     $this->environmentalClass($product, $item);
 
                     $this->brands($product, $item);
-
-
-                    // # active ingredients
-                    // foreach (self::toArray($item[3], ["+"]) as $row) {
-                    //     $row = explode("(", $row);
-
-                    //     $chemicalGroupName = self::normalize(str_replace(")", "", $row[1]));
-                    //     if ($chemicalGroupName) {
-                    //         $chemicalGroup = ChemicalGroup::whereRaw("lower(name) = ?", strtolower($chemicalGroupName))->first();
-                    //         if (!$chemicalGroup) {
-                    //             $chemicalGroup = new ChemicalGroup();
-                    //             $chemicalGroup->name = Str::title($chemicalGroupName);
-                    //             $chemicalGroup->save();
-                    //         }
-                    //     }
-
-                    //     $activeIngredientName = self::normalize(str_replace(")", "", $row[0]));
-                    //     if ($activeIngredientName) {
-                    //         $activeIngredient = ActiveIngredient::whereRaw("lower(name) = ?", strtolower($activeIngredientName))->first();
-                    //         if (!$activeIngredient) {
-                    //             $activeIngredient = new ActiveIngredient();
-                    //             $activeIngredient->name = Str::title($activeIngredientName);
-                    //             $activeIngredient->chemical_group_id = $chemicalGroup->id;
-                    //             $activeIngredient->save();
-                    //         }
-                    //     }
-
-                    //     $productActiveIngredient = ProductActiveIngredient::where("product_id", $product->id)
-                    //         ->where("active_ingredient_id", $activeIngredient->id)
-                    //         ->first();
-
-                    //     if (!$productActiveIngredient) {
-                    //         $productActiveIngredient = new ProductActiveIngredient();
-                    //         $productActiveIngredient->product_id = $product->id;
-                    //         $productActiveIngredient->active_ingredient_id = $activeIngredient->id;
-                    //         $productActiveIngredient->concentration = self::normalize(str_replace(")", "", $row[2]));
-                    //         $productActiveIngredient->save();
-                    //     }
-                    // }
-
-                    // # classes
-                    // foreach (self::toArray($item[5]) as $value) {
-                    //     if ($value) {
-                    //         $agroClass = AgroClass::whereRaw("lower(name) = ?", strtolower($value))->firstOrNew();
-                    //         $agroClass->name = $value;
-                    //         $agroClass->save();
-
-                    //         $productClass = ProductClass::where("product_id", $product->id)
-                    //             ->where("class_id", $agroClass->id)
-                    //             ->first();
-                    //         if (!$productClass) {
-                    //             $productClass = new ProductClass();
-                    //             $productClass->product_id = $product->id;
-                    //             $productClass->class_id = $agroClass->id;
-                    //             $productClass->save();
-                    //         }
-                    //     }
-                    // }
-
-                    // # action modes
-                    // foreach (self::toArray($item[6]) as $value) {
-                    //     if ($value) {
-                    //         $actionMode = ActionMode::whereRaw("lower(description) = ?", strtolower($value))->firstOrNew();
-                    //         $actionMode->description =  Str::title($value);
-                    //         $actionMode->save();
-
-                    //         $productActionMode = ProductActionMode::where("product_id", $product->id)
-                    //             ->where("action_mode_id", $actionMode->id)
-                    //             ->first();
-                    //         if (!$productActionMode) {
-                    //             $productActionMode = new ProductActionMode();
-                    //             $productActionMode->product_id = $product->id;
-                    //             $productActionMode->action_mode_id = $actionMode->id;
-                    //             $productActionMode->save();
-                    //         }
-                    //     }
-                    // }
+                    $this->activeIngredients($product, $item);
+                    $this->classes($product, $item);
+                    $this->actionMode($product, $item);
 
                     // # cultures
                     // // TODO: todas as culturas
@@ -417,14 +343,140 @@ class Import extends Command
         }
     }
 
+    private function activeIngredients(Product $product, $item)
+    {
+        foreach (self::toArray($item[3], ["+"]) as $row) {
+            $row = explode("(", $row);
+
+            $activeIngredientName = self::normalize(str_replace(")", "", $row[0]));
+            $chemicalGroupName = self::normalize(str_replace(")", "", $row[1]));
+            $concentration = self::normalize(str_replace(")", "", $row[2]));
+            if ($activeIngredientName && $chemicalGroupName && $concentration) {
+                $chemicalGroup = ChemicalGroup::whereRaw("lower(name) = ?", strtolower($chemicalGroupName))->firstOrNew();
+                $chemicalGroup->name = Str::title($chemicalGroupName);
+                $chemicalGroup->save();
+
+                $activeIngredient = ActiveIngredient::whereRaw("lower(name) = ?", strtolower($activeIngredientName))->firstOrNew();
+                $activeIngredient->name = Str::title($activeIngredientName);
+                $activeIngredient->save();
+
+                DB::table('cms.active_ingredients_chemical_group_links')->updateOrInsert(
+                    [
+                        'active_ingredient_id' => $activeIngredient->id,
+                        'chemical_group_id' => $chemicalGroup->id,
+                    ],
+                );
+
+                $productActiveIngredient = ProductActiveIngredient::whereRaw("lower(concentration) = ?", strtolower($concentration))->firstOrNew();
+                $productActiveIngredient->concentration = $concentration;
+                $productActiveIngredient->save();
+
+                DB::table('cms.product_active_ingredients_active_ingredient_links')->updateOrInsert(
+                    [
+                        'product_active_ingredient_id' => $productActiveIngredient->id,
+                        'active_ingredient_id' => $activeIngredient->id,
+                    ],
+                );
+
+                DB::table('cms.product_active_ingredients_product_links')->updateOrInsert(
+                    [
+                        'product_active_ingredient_id' => $productActiveIngredient->id,
+                        'product_id' => $product->id,
+                    ],
+                );
+            }
+        }
+    }
+
+    private function classes(Product $product, $item)
+    {
+        foreach (self::toArray($item[5]) as $value) {
+            if ($value) {
+                $agroClass = AgroClass::whereRaw("lower(name) = ?", strtolower($value))->firstOrNew();
+                $agroClass->name = $value;
+                $agroClass->save();
+
+                $record = DB::table('cms.product_classes_class_links', "pccl")
+                    ->join('cms.product_classes_product_links as pcpl', "pcpl.product_class_id", "=", "pccl.product_class_id")
+                    ->where('pccl.class_id', $agroClass->id)
+                    ->where('pcpl.product_id', $product->id)
+                    ->first();
+
+                if (!$record) {
+                    $productClass = new ProductClass();
+                    $productClass->save();
+
+                    DB::table('cms.product_classes_class_links')
+                        ->insert([
+                            'product_class_id' => $productClass->id,
+                            'class_id' => $agroClass->id,
+                        ]);
+
+                    DB::table('cms.product_classes_product_links')
+                        ->insert([
+                            'product_class_id' => $productClass->id,
+                            'product_id' => $product->id,
+                        ]);
+                }
+            }
+        }
+    }
+
+    private function actionMode(Product $product, $item)
+    {
+        foreach (self::toArray($item[6]) as $value) {
+            if ($value) {
+                $actionMode = ActionMode::whereRaw("lower(description) = ?", strtolower($value))->firstOrNew();
+                $actionMode->description =  Str::title($value);
+                $actionMode->save();
+
+                $record = DB::table('cms.product_action_modes_action_mode_links', "pamaml")
+                    ->join('cms.product_action_modes_product_links as pampl', "pampl.product_action_mode_id", "=", "pamaml.product_action_mode_id")
+                    ->where('pamaml.action_mode_id', $actionMode->id)
+                    ->where('pampl.product_id', $product->id)
+                    ->first();
+
+                if (!$record) {
+                    $productActionMode = new ProductActionMode();
+                    $productActionMode->save();
+
+                    DB::table('cms.product_action_modes_action_mode_links')
+                        ->insert([
+                            'product_action_mode_id' => $productActionMode->id,
+                            'action_mode_id' => $actionMode->id,
+                        ]);
+
+                    DB::table('cms.product_action_modes_product_links')
+                        ->insert([
+                            'product_action_mode_id' => $productActionMode->id,
+                            'product_id' => $product->id,
+                        ]);
+                }
+            }
+        }
+    }
+
     private function clear()
     {
+        DB::table('cms.product_action_modes_product_links')->delete();
+        DB::table('cms.product_action_modes_action_mode_links')->delete();
+        DB::table('cms.product_classes_product_links')->delete();
+        DB::table('cms.product_classes_class_links')->delete();
+        DB::table('cms.product_active_ingredients_product_links')->delete();
+        DB::table('cms.product_active_ingredients_active_ingredient_links')->delete();
+        DB::table('cms.active_ingredients_chemical_group_links')->delete();
         DB::table('cms.product_brands_product_links')->delete();
         DB::table('cms.products_environmental_class_links')->delete();
         DB::table('cms.products_toxicological_class_links')->delete();
         DB::table('cms.products_registration_holder_links')->delete();
         DB::table('cms.products_formulation_links')->delete();
 
+        ActionMode::query()->forceDelete();
+        ProductClass::query()->forceDelete();
+        AgroClass::query()->forceDelete();
+        ProductActiveIngredient::query()->forceDelete();
+        ActiveIngredient::query()->forceDelete();
+        ChemicalGroup::query()->forceDelete();
         ProductBrand::query()->forceDelete();
         Product::query()->forceDelete();
         EnvironmentalClass::query()->forceDelete();

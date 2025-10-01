@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ActiveIngredient extends Model
 {
+    protected $connection = 'cms';
     protected $fillable = ['name', 'chemical_group_id'];
 
     public function chemicalGroup(): BelongsTo
