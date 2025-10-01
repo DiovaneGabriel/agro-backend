@@ -112,60 +112,8 @@ class Import extends Command
                     $this->activeIngredients($product, $item);
                     $this->classes($product, $item);
                     $this->actionMode($product, $item);
-
-                    // # cultures
-                    // // TODO: todas as culturas
-                    // foreach (self::toArray($item[7]) as $value) {
-                    //     if ($value) {
-                    //         $culture = Culture::whereRaw("lower(name) = ?", strtolower($value))->firstOrNew();
-                    //         $culture->name = $value;
-                    //         $culture->save();
-
-                    //         $productCulture = ProductCulture::where("product_id", $product->id)
-                    //             ->where("culture_id", $culture->id)
-                    //             ->first();
-                    //         if (!$productCulture) {
-                    //             $productCulture = new ProductCulture();
-                    //             $productCulture->product_id = $product->id;
-                    //             $productCulture->culture_id = $culture->id;
-                    //             $productCulture->save();
-                    //         }
-                    //     }
-                    // }
-
-                    // # pragues
-                    // $pragueName = self::normalize($item[8]);
-                    // if ($pragueName) {
-                    //     $prague = Prague::whereRaw("lower(scientific_name) = ?", strtolower($pragueName))->firstOrNew();
-                    //     $prague->scientific_name = $pragueName;
-                    //     $prague->save();
-
-                    //     $productPrague = ProductPrague::where("product_id", $product->id)
-                    //         ->where("prague_id", $prague->id)
-                    //         ->first();
-
-                    //     if (!$productPrague) {
-                    //         $productPrague = new ProductPrague();
-                    //         $productPrague->product_id = $product->id;
-                    //         $productPrague->prague_id = $prague->id;
-                    //         $productPrague->save();
-                    //     }
-
-                    //     foreach (self::toArray($item[9]) as $value) {
-                    //         if ($value) {
-                    //             $commomName = PragueCommonName::where("prague_id", $prague->id)
-                    //                 ->whereRaw("lower(name) = ?", strtolower($value))
-                    //                 ->first();
-
-                    //             if (!$commomName) {
-                    //                 $commomName = new PragueCommonName();
-                    //                 $commomName->prague_id = $prague->id;
-                    //                 $commomName->name = $value;
-                    //                 $commomName->save();
-                    //             }
-                    //         }
-                    //     }
-                    // }
+                    $this->cultures($product, $item);
+                    $this->pragues($product, $item);
 
                     // # companies
                     // foreach (self::toArray($item[10], ["+"]) as $value) {
@@ -456,8 +404,96 @@ class Import extends Command
         }
     }
 
+    private function cultures(Product $product, $item)
+    {
+        // TODO: todas as culturas
+        foreach (self::toArray($item[7]) as $value) {
+            if ($value) {
+                $culture = Culture::whereRaw("lower(name) = ?", strtolower($value))->firstOrNew();
+                $culture->name = $value;
+                $culture->save();
+
+                $record = DB::table('cms.product_cultures_culture_links', "pccl")
+                    ->join('cms.product_cultures_product_links as pcpl', "pcpl.product_culture_id", "=", "pccl.product_culture_id")
+                    ->where('pccl.culture_id', $culture->id)
+                    ->where('pcpl.product_id', $product->id)
+                    ->first();
+
+                if (!$record) {
+                    $productCulture = new ProductCulture();
+                    $productCulture->save();
+
+                    DB::table('cms.product_cultures_culture_links')
+                        ->insert([
+                            'product_culture_id' => $productCulture->id,
+                            'culture_id' => $culture->id,
+                        ]);
+
+                    DB::table('cms.product_cultures_product_links')
+                        ->insert([
+                            'product_culture_id' => $productCulture->id,
+                            'product_id' => $product->id,
+                        ]);
+                }
+            }
+        }
+    }
+
+    private function pragues(Product $product, $item)
+    {
+        $pragueName = self::normalize($item[8]);
+        if ($pragueName) {
+            $prague = Prague::whereRaw("lower(scientific_name) = ?", strtolower($pragueName))->firstOrNew();
+            $prague->scientific_name = $pragueName;
+            $prague->save();
+
+            $record = DB::table('cms.product_pragues_prague_links', "pppl")
+                ->join('cms.product_pragues_product_links as pppl2', "pppl2.product_prague_id", "=", "pppl.product_prague_id")
+                ->where('pppl.prague_id', $prague->id)
+                ->where('pppl2.product_id', $product->id)
+                ->first();
+
+            if (!$record) {
+                $productPrague = new ProductPrague();
+                $productPrague->save();
+
+                DB::table('cms.product_pragues_prague_links')
+                    ->insert([
+                        'product_prague_id' => $productPrague->id,
+                        'prague_id' => $prague->id,
+                    ]);
+
+                DB::table('cms.product_pragues_product_links')
+                    ->insert([
+                        'product_prague_id' => $productPrague->id,
+                        'product_id' => $product->id,
+                    ]);
+            }
+
+            foreach (self::toArray($item[9]) as $value) {
+                if ($value) {
+                    $commomName = PragueCommonName::whereRaw("lower(name) = ?", strtolower($value))->firstOrNew();
+                    $commomName->name = Str::title($value);
+                    $commomName->save();
+
+                    DB::table('cms.prague_common_names_prague_links')->updateOrInsert(
+                        [
+                            'prague_common_name_id' => $commomName->id,
+                            'prague_id' => $prague->id,
+                        ],
+                    );
+                }
+            }
+        }
+    }
+
     private function clear()
     {
+        DB::table('cms.prague_common_names_prague_links')->delete();
+        DB::table('cms.product_pragues_product_links')->delete();
+        DB::table('cms.product_pragues_prague_links')->delete();
+        DB::table('cms.product_cultures_product_links')->delete();
+        DB::table('cms.product_cultures_culture_links')->delete();
         DB::table('cms.product_action_modes_product_links')->delete();
         DB::table('cms.product_action_modes_action_mode_links')->delete();
         DB::table('cms.product_classes_product_links')->delete();
@@ -471,6 +507,11 @@ class Import extends Command
         DB::table('cms.products_registration_holder_links')->delete();
         DB::table('cms.products_formulation_links')->delete();
 
+        PragueCommonName::query()->forceDelete();
+        ProductPrague::query()->forceDelete();
+        Prague::query()->forceDelete();
+        ProductCulture::query()->forceDelete();
+        Culture::query()->forceDelete();
         ActionMode::query()->forceDelete();
         ProductClass::query()->forceDelete();
         AgroClass::query()->forceDelete();
