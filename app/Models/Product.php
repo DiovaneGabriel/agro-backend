@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Product extends Model
 {
+    protected $connection = 'cms';
     protected $fillable = [
         'is_active',
         'is_organic',

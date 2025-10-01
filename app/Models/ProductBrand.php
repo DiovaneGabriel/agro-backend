@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ProductBrand extends Model
 {
+    protected $connection = 'cms';
     protected $fillable = ['product_id', 'name'];
 
     public function product(): BelongsTo
