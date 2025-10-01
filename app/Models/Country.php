@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Country extends Model
 {
+    protected $connection = 'cms';
     protected $fillable = ['name'];
 
     public function companies(): HasMany

@@ -114,43 +114,7 @@ class Import extends Command
                     $this->actionMode($product, $item);
                     $this->cultures($product, $item);
                     $this->pragues($product, $item);
-
-                    // # companies
-                    // foreach (self::toArray($item[10], ["+"]) as $value) {
-                    //     $value = str_replace("<", "+", $value);
-                    //     $value = str_replace(">", "+", $value);
-                    //     $value = explode("+", $value);
-
-                    //     if (isset($value[1]) && isset($value[2])) {
-                    //         $countryName = trim($value[1]);
-                    //         if ($countryName) {
-                    //             $country = Country::whereRaw("lower(name) = ?", strtolower($countryName))->firstOrNew();
-                    //             $country->name = $countryName;
-                    //             $country->save();
-
-                    //             $companyName = trim(str_replace("(", "", $value[0]));
-                    //             if ($companyName) {
-                    //                 $company = Company::whereRaw("lower(name) = ?", strtolower($companyName))->firstOrNew();
-                    //                 $company->name = $companyName;
-                    //                 $company->country_id = $country->id;
-                    //                 $company->save();
-
-                    //                 $typeName = trim(str_replace(")", "", $value[2]));
-                    //                 $companyType = CompanyType::whereRaw("lower(name) = ?", $typeName)->firstOrNew();
-                    //                 $companyType->name = $typeName;
-                    //                 $companyType->save();
-
-                    //                 $productCompany = ProductCompany::where("product_id", $product->id)
-                    //                     ->where("company_id", $company->id)
-                    //                     ->firstOrNew();
-                    //                 $productCompany->product_id = $product->id;
-                    //                 $productCompany->company_id = $company->id;
-                    //                 $productCompany->company_type_id = $companyType->id;
-                    //                 $productCompany->save();
-                    //             }
-                    //         }
-                    //     }
-                    // }
+                    $this->companies($product, $item);
 
                     $this->info(var_dump($item));
                     die();
@@ -487,8 +451,79 @@ class Import extends Command
         }
     }
 
+    private function companies(Product $product, $item)
+    {
+        foreach (self::toArray($item[10], ["+"]) as $value) {
+            $value = str_replace("<", "+", $value);
+            $value = str_replace(">", "+", $value);
+            $value = explode("+", $value);
+
+            if (isset($value[1]) && isset($value[2])) {
+                $countryName = trim($value[1]);
+                $companyName = trim(str_replace("(", "", $value[0]));
+                $typeName = trim(str_replace(")", "", $value[2]));
+
+                if ($countryName && $companyName && $typeName) {
+                    $country = Country::whereRaw("lower(name) = ?", strtolower($countryName))->firstOrNew();
+                    $country->name = $countryName;
+                    $country->save();
+
+                    $company = Company::whereRaw("lower(name) = ?", strtolower($companyName))->firstOrNew();
+                    $company->name = $companyName;
+                    $company->save();
+
+                    DB::table('cms.companies_country_links')->updateOrInsert(
+                        [
+                            'company_id' => $company->id,
+                            'country_id' => $country->id,
+                        ],
+                    );
+
+                    $companyType = CompanyType::whereRaw("lower(name) = ?", $typeName)->firstOrNew();
+                    $companyType->name = $typeName;
+                    $companyType->save();
+
+                    $record = DB::table('cms.product_companies_company_links', "pccl")
+                        ->join('cms.product_companies_company_type_links as pcctl', "pcctl.product_company_id", "=", "pccl.product_company_id")
+                        ->join('cms.product_companies_product_links as pcpl', "pcpl.product_company_id", "=", "pccl.product_company_id")
+                        ->where('pccl.company_id', $company->id)
+                        ->where('pcctl.company_type_id', $companyType->id)
+                        ->where('pcpl.product_id', $product->id)
+                        ->first();
+
+                    if (!$record) {
+                        $productCompany = new ProductCompany();
+                        $productCompany->save();
+
+                        DB::table('cms.product_companies_company_links')
+                            ->insert([
+                                'product_company_id' => $productCompany->id,
+                                'company_id' => $company->id,
+                            ]);
+
+                        DB::table('cms.product_companies_company_type_links')
+                            ->insert([
+                                'product_company_id' => $productCompany->id,
+                                'company_type_id' => $companyType->id,
+                            ]);
+
+                        DB::table('cms.product_companies_product_links')
+                            ->insert([
+                                'product_company_id' => $productCompany->id,
+                                'product_id' => $product->id,
+                            ]);
+                    }
+                }
+            }
+        }
+    }
+
     private function clear()
     {
+        DB::table('cms.product_companies_product_links')->delete();
+        DB::table('cms.product_companies_company_type_links')->delete();
+        DB::table('cms.product_companies_company_links')->delete();
+        DB::table('cms.companies_country_links')->delete();
         DB::table('cms.prague_common_names_prague_links')->delete();
         DB::table('cms.product_pragues_product_links')->delete();
         DB::table('cms.product_pragues_prague_links')->delete();
@@ -507,6 +542,9 @@ class Import extends Command
         DB::table('cms.products_registration_holder_links')->delete();
         DB::table('cms.products_formulation_links')->delete();
 
+        ProductCompany::query()->forceDelete();
+        CompanyType::query()->forceDelete();
+        Country::query()->forceDelete();
         PragueCommonName::query()->forceDelete();
         ProductPrague::query()->forceDelete();
         Prague::query()->forceDelete();

@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class CompanyType extends Model
 {
+    protected $connection = 'cms';
     protected $fillable = ['name'];
 
     public function productCompanies(): HasMany
