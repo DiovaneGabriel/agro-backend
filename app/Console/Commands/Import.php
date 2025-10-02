@@ -27,7 +27,6 @@ use App\Models\ToxicologicalClass;
 use Exception;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class Import extends Command
@@ -94,27 +93,31 @@ class Import extends Command
                     $isActive = self::normalize($item[14]) != 'TRUE' ? false : true;
                     $registerNumber = self::normalize($item[0]);
 
-                    $product = Product::where('reference_id', $id)->firstOrNew();
-                    $product->reference_id = $id;
+                    $formulation = $this->formulation($item);
+                    $registrationHolder = $this->registrationHolder($item);
+                    $toxicologicalClass = $this->toxicologicalClass($item);
+                    $environmentalClass = $this->environmentalClass($item);
+
+                    $product = Product::where('id', $id)->firstOrNew();
+                    $product->id = $id;
                     $product->is_active = $isActive;
                     $product->is_organic = $isOrganic;
                     $product->register_number = $registerNumber;
+                    $product->formulation_id = $formulation->id;
+                    $product->registration_holder_id = $registrationHolder->id;
+                    $product->toxicological_class_id = $toxicologicalClass->id;
+                    $product->environmental_class_id = $environmentalClass->id;
                     // $product->HRAC
                     // $product->WSSA
                     $product->save();
 
-                    $this->formulation($product, $item);
-                    $this->registrationHolder($product, $item);
-                    $this->toxicologicalClass($product, $item);
-                    $this->environmentalClass($product, $item);
-
                     $this->brands($product, $item);
                     $this->activeIngredients($product, $item);
                     $this->classes($product, $item);
-                    $this->actionMode($product, $item);
-                    $this->cultures($product, $item);
-                    $this->pragues($product, $item);
-                    $this->companies($product, $item);
+                    // $this->actionMode($product, $item);
+                    // $this->cultures($product, $item);
+                    // $this->pragues($product, $item);
+                    // $this->companies($product, $item);
 
                     $this->info(var_dump($item));
                     die();
@@ -148,7 +151,7 @@ class Import extends Command
         return $value;
     }
 
-    private static function toArray($value, array $separators = [" e ", ", ", "/", ";"])
+    private static function toArray($value, array $separators = [" E ", " e ", ", ", "/", ";"])
     {
         foreach ($separators as $separator) {
             $value = str_replace($separator, "+", $value);
@@ -175,7 +178,7 @@ class Import extends Command
         }
     }
 
-    private function formulation(Product $product, $item)
+    private function formulation($item)
     {
         $formulationDescription = self::normalize($item[2]);
 
@@ -183,74 +186,51 @@ class Import extends Command
         $formulation->description = $formulationDescription;
         $formulation->save();
 
-        DB::table('cms.products_formulation_links')->updateOrInsert(
-            [
-                'product_id' => $product->id,
-                'formulation_id' => $formulation->id,
-            ],
-        );
+        return $formulation;
     }
 
-    private function registrationHolder(Product $product, $item)
+    private function registrationHolder($item)
     {
         $registrationHolderName = self::normalize($item[4]);
         $registrationHolder = RegistrationHolder::whereRaw("lower(name) = ?", strtolower($registrationHolderName))->firstOrNew();
         $registrationHolder->name = $registrationHolderName;
         $registrationHolder->save();
 
-        DB::table('cms.products_registration_holder_links')->updateOrInsert(
-            [
-                'product_id' => $product->id,
-                'registration_holder_id' => $registrationHolder->id,
-            ],
-        );
+        return $registrationHolder;
     }
 
 
-    private function toxicologicalClass(Product $product, $item)
+    private function toxicologicalClass($item)
     {
         $toxicologicalClassName = self::normalize($item[11]);
         $toxicologicalClass = ToxicologicalClass::whereRaw("lower(name) = ?", strtolower($toxicologicalClassName))->firstOrNew();
         $toxicologicalClass->name = $toxicologicalClassName;
         $toxicologicalClass->save();
 
-        DB::table('cms.products_toxicological_class_links')->updateOrInsert(
-            [
-                'product_id' => $product->id,
-                'toxicological_class_id' => $toxicologicalClass->id,
-            ],
-        );
+        return $toxicologicalClass;
     }
 
-    private function environmentalClass(Product $product, $item)
+    private function environmentalClass($item)
     {
         $environmentalClassName = self::normalize($item[12]);
         $environmentalClass = EnvironmentalClass::whereRaw("lower(name) = ?", strtolower($environmentalClassName))->firstOrNew();
         $environmentalClass->name = $environmentalClassName;
         $environmentalClass->save();
 
-        DB::table('cms.products_environmental_class_links')->updateOrInsert(
-            [
-                'product_id' => $product->id,
-                'environmental_class_id' => $environmentalClass->id,
-            ],
-        );
+        return $environmentalClass;
     }
 
     private function brands(Product $product, $item)
     {
         foreach (self::toArray($item[1]) as $value) {
             if ($value) {
-                $brand = ProductBrand::whereRaw("lower(name) = ?", strtolower($value))->firstOrNew();
+                $brand = ProductBrand::query()
+                    ->whereRaw("lower(name) = ?", strtolower($value))
+                    ->where("product_id", $product->id)
+                    ->firstOrNew();
+                $brand->product_id = $product->id;
                 $brand->name = $value;
                 $brand->save();
-
-                DB::table('cms.product_brands_product_links')->updateOrInsert(
-                    [
-                        'product_id' => $product->id,
-                        'product_brand_id' => $brand->id,
-                    ],
-                );
             }
         }
     }
@@ -264,38 +244,29 @@ class Import extends Command
             $chemicalGroupName = self::normalize(str_replace(")", "", $row[1]));
             $concentration = self::normalize(str_replace(")", "", $row[2]));
             if ($activeIngredientName && $chemicalGroupName && $concentration) {
-                $chemicalGroup = ChemicalGroup::whereRaw("lower(name) = ?", strtolower($chemicalGroupName))->firstOrNew();
+                $chemicalGroup = ChemicalGroup::query()
+                    ->whereRaw("lower(name) = ?", strtolower($chemicalGroupName))
+                    ->firstOrNew();
                 $chemicalGroup->name = Str::title($chemicalGroupName);
                 $chemicalGroup->save();
 
-                $activeIngredient = ActiveIngredient::whereRaw("lower(name) = ?", strtolower($activeIngredientName))->firstOrNew();
+                $activeIngredient = ActiveIngredient::query()
+                    ->whereRaw("lower(name) = ?", strtolower($activeIngredientName))
+                    ->where("chemical_group_id", $chemicalGroup->id)
+                    ->firstOrNew();
+                $activeIngredient->chemical_group_id = $chemicalGroup->id;
                 $activeIngredient->name = Str::title($activeIngredientName);
                 $activeIngredient->save();
 
-                DB::table('cms.active_ingredients_chemical_group_links')->updateOrInsert(
-                    [
-                        'active_ingredient_id' => $activeIngredient->id,
-                        'chemical_group_id' => $chemicalGroup->id,
-                    ],
-                );
-
-                $productActiveIngredient = ProductActiveIngredient::whereRaw("lower(concentration) = ?", strtolower($concentration))->firstOrNew();
+                $productActiveIngredient = ProductActiveIngredient::query()
+                    ->whereRaw("lower(concentration) = ?", strtolower($concentration))
+                    ->where("product_id", $product->id)
+                    ->where("active_ingredient_id", $activeIngredient->id)
+                    ->firstOrNew();
                 $productActiveIngredient->concentration = $concentration;
+                $productActiveIngredient->product_id = $product->id;
+                $productActiveIngredient->active_ingredient_id = $activeIngredient->id;
                 $productActiveIngredient->save();
-
-                DB::table('cms.product_active_ingredients_active_ingredient_links')->updateOrInsert(
-                    [
-                        'product_active_ingredient_id' => $productActiveIngredient->id,
-                        'active_ingredient_id' => $activeIngredient->id,
-                    ],
-                );
-
-                DB::table('cms.product_active_ingredients_product_links')->updateOrInsert(
-                    [
-                        'product_active_ingredient_id' => $productActiveIngredient->id,
-                        'product_id' => $product->id,
-                    ],
-                );
             }
         }
     }
@@ -308,28 +279,13 @@ class Import extends Command
                 $agroClass->name = $value;
                 $agroClass->save();
 
-                $record = DB::table('cms.product_classes_class_links', "pccl")
-                    ->join('cms.product_classes_product_links as pcpl', "pcpl.product_class_id", "=", "pccl.product_class_id")
-                    ->where('pccl.class_id', $agroClass->id)
-                    ->where('pcpl.product_id', $product->id)
-                    ->first();
-
-                if (!$record) {
-                    $productClass = new ProductClass();
-                    $productClass->save();
-
-                    DB::table('cms.product_classes_class_links')
-                        ->insert([
-                            'product_class_id' => $productClass->id,
-                            'class_id' => $agroClass->id,
-                        ]);
-
-                    DB::table('cms.product_classes_product_links')
-                        ->insert([
-                            'product_class_id' => $productClass->id,
-                            'product_id' => $product->id,
-                        ]);
-                }
+                $productClass = ProductClass::query()
+                    ->where("product_id", $product->id)
+                    ->where("class_id", $agroClass->id)
+                    ->firstOrNew();
+                $productClass->product_id = $product->id;
+                $productClass->class_id = $agroClass->id;
+                $productClass->save();
             }
         }
     }
@@ -337,7 +293,11 @@ class Import extends Command
     private function actionMode(Product $product, $item)
     {
         foreach (self::toArray($item[6]) as $value) {
-            if ($value) {
+            if (trim($value)) {
+                $value = strtolower($value);
+                $value = str_replace("contao", "contato", $value);
+                $value = str_replace("de ", "", $value);
+
                 $actionMode = ActionMode::whereRaw("lower(description) = ?", strtolower($value))->firstOrNew();
                 $actionMode->description =  Str::title($value);
                 $actionMode->save();
@@ -435,7 +395,9 @@ class Import extends Command
             }
 
             foreach (self::toArray($item[9]) as $value) {
-                if ($value) {
+
+                $value = preg_replace('/\s*\(\d+\)/', '', $value);
+                if ($value && $value != "-") {
                     $commomName = PragueCommonName::whereRaw("lower(name) = ?", strtolower($value))->firstOrNew();
                     $commomName->name = Str::title($value);
                     $commomName->save();
@@ -462,10 +424,11 @@ class Import extends Command
                 $countryName = trim($value[1]);
                 $companyName = trim(str_replace("(", "", $value[0]));
                 $typeName = trim(str_replace(")", "", $value[2]));
+                $typeName = "IMPORTADO" ? "IMPORTADOR" : $typeName;
 
                 if ($countryName && $companyName && $typeName) {
                     $country = Country::whereRaw("lower(name) = ?", strtolower($countryName))->firstOrNew();
-                    $country->name = $countryName;
+                    $country->name = Str::title($countryName);
                     $country->save();
 
                     $company = Company::whereRaw("lower(name) = ?", strtolower($companyName))->firstOrNew();
@@ -480,7 +443,7 @@ class Import extends Command
                     );
 
                     $companyType = CompanyType::whereRaw("lower(name) = ?", $typeName)->firstOrNew();
-                    $companyType->name = $typeName;
+                    $companyType->name = Str::title($typeName);
                     $companyType->save();
 
                     $record = DB::table('cms.product_companies_company_links', "pccl")
@@ -520,36 +483,16 @@ class Import extends Command
 
     private function clear()
     {
-        DB::table('cms.product_companies_product_links')->delete();
-        DB::table('cms.product_companies_company_type_links')->delete();
-        DB::table('cms.product_companies_company_links')->delete();
-        DB::table('cms.companies_country_links')->delete();
-        DB::table('cms.prague_common_names_prague_links')->delete();
-        DB::table('cms.product_pragues_product_links')->delete();
-        DB::table('cms.product_pragues_prague_links')->delete();
-        DB::table('cms.product_cultures_product_links')->delete();
-        DB::table('cms.product_cultures_culture_links')->delete();
-        DB::table('cms.product_action_modes_product_links')->delete();
-        DB::table('cms.product_action_modes_action_mode_links')->delete();
-        DB::table('cms.product_classes_product_links')->delete();
-        DB::table('cms.product_classes_class_links')->delete();
-        DB::table('cms.product_active_ingredients_product_links')->delete();
-        DB::table('cms.product_active_ingredients_active_ingredient_links')->delete();
-        DB::table('cms.active_ingredients_chemical_group_links')->delete();
-        DB::table('cms.product_brands_product_links')->delete();
-        DB::table('cms.products_environmental_class_links')->delete();
-        DB::table('cms.products_toxicological_class_links')->delete();
-        DB::table('cms.products_registration_holder_links')->delete();
-        DB::table('cms.products_formulation_links')->delete();
-
         ProductCompany::query()->forceDelete();
         CompanyType::query()->forceDelete();
         Country::query()->forceDelete();
+        Company::query()->forceDelete();
         PragueCommonName::query()->forceDelete();
         ProductPrague::query()->forceDelete();
         Prague::query()->forceDelete();
         ProductCulture::query()->forceDelete();
         Culture::query()->forceDelete();
+        ProductActionMode::query()->forceDelete();
         ActionMode::query()->forceDelete();
         ProductClass::query()->forceDelete();
         AgroClass::query()->forceDelete();

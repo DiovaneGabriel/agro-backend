@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class AgroClass extends Model
 {
     // A tabela se chama "classes", então definimos explicitamente:
-    protected $connection = 'cms';
+    // protected $connection = 'cms';
     protected $table = 'classes';
     protected $fillable = ['name'];
 

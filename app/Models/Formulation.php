@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Formulation extends Model
 {
-    protected $connection = 'cms';
+    // protected $connection = 'cms';
     protected $fillable = ['description'];
 
     public function products(): HasMany

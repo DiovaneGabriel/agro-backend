@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Company extends Model
 {
-    protected $connection = 'cms';
+    // protected $connection = 'cms';
     protected $fillable = ['name', 'country_id'];
 
     public function country(): BelongsTo

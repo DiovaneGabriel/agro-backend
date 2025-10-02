@@ -13,7 +13,29 @@ services:
         restart: unless-stopped
         networks:
             agro:
+        depends_on:
+            - mariadb
+
+    mariadb:
+        image: mariadb:11.3.2
+        container_name: "agro-mariadb"
+        volumes:
+            - agro-mariadb-data:/var/lib/mysql
+            - .docker/mariadb/scripts:/docker-entrypoint-initdb.d
+            - .docker/mariadb/config/50-server.cnf:/etc/mysql/mariadb.conf.d/50-server.cnf
+        ports:
+            - 3306:3306
+        environment:
+            MYSQL_PASSWORD: agro
+            MYSQL_ROOT_PASSWORD: agro
+        command: --init-file /docker-entrypoint-initdb.d/create-database.sql
+        restart: unless-stopped
+        networks:
+            agro:
 
 networks:
     agro:
         external: true
+
+volumes:
+    agro-mariadb-data:
