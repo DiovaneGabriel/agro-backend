@@ -114,10 +114,10 @@ class Import extends Command
                     $this->brands($product, $item);
                     $this->activeIngredients($product, $item);
                     $this->classes($product, $item);
-                    // $this->actionMode($product, $item);
-                    // $this->cultures($product, $item);
-                    // $this->pragues($product, $item);
-                    // $this->companies($product, $item);
+                    $this->actionMode($product, $item);
+                    $this->cultures($product, $item);
+                    $this->pragues($product, $item);
+                    $this->companies($product, $item);
 
                     $this->info(var_dump($item));
                     die();
@@ -298,32 +298,19 @@ class Import extends Command
                 $value = str_replace("contao", "contato", $value);
                 $value = str_replace("de ", "", $value);
 
-                $actionMode = ActionMode::whereRaw("lower(description) = ?", strtolower($value))->firstOrNew();
+                $actionMode = ActionMode::query()
+                    ->whereRaw("lower(description) = ?", strtolower($value))
+                    ->firstOrNew();
                 $actionMode->description =  Str::title($value);
                 $actionMode->save();
 
-                $record = DB::table('cms.product_action_modes_action_mode_links', "pamaml")
-                    ->join('cms.product_action_modes_product_links as pampl', "pampl.product_action_mode_id", "=", "pamaml.product_action_mode_id")
-                    ->where('pamaml.action_mode_id', $actionMode->id)
-                    ->where('pampl.product_id', $product->id)
-                    ->first();
-
-                if (!$record) {
-                    $productActionMode = new ProductActionMode();
-                    $productActionMode->save();
-
-                    DB::table('cms.product_action_modes_action_mode_links')
-                        ->insert([
-                            'product_action_mode_id' => $productActionMode->id,
-                            'action_mode_id' => $actionMode->id,
-                        ]);
-
-                    DB::table('cms.product_action_modes_product_links')
-                        ->insert([
-                            'product_action_mode_id' => $productActionMode->id,
-                            'product_id' => $product->id,
-                        ]);
-                }
+                $productActionMode = ProductActionMode::query()
+                    ->where("product_id", $product->id)
+                    ->where("action_mode_id", $actionMode->id)
+                    ->firstOrNew();
+                $productActionMode->product_id = $product->id;
+                $productActionMode->action_mode_id = $actionMode->id;
+                $productActionMode->save();
             }
         }
     }
@@ -333,32 +320,19 @@ class Import extends Command
         // TODO: todas as culturas
         foreach (self::toArray($item[7]) as $value) {
             if ($value) {
-                $culture = Culture::whereRaw("lower(name) = ?", strtolower($value))->firstOrNew();
+                $culture = Culture::query()
+                    ->whereRaw("lower(name) = ?", strtolower($value))
+                    ->firstOrNew();
                 $culture->name = $value;
                 $culture->save();
 
-                $record = DB::table('cms.product_cultures_culture_links', "pccl")
-                    ->join('cms.product_cultures_product_links as pcpl', "pcpl.product_culture_id", "=", "pccl.product_culture_id")
-                    ->where('pccl.culture_id', $culture->id)
-                    ->where('pcpl.product_id', $product->id)
-                    ->first();
-
-                if (!$record) {
-                    $productCulture = new ProductCulture();
-                    $productCulture->save();
-
-                    DB::table('cms.product_cultures_culture_links')
-                        ->insert([
-                            'product_culture_id' => $productCulture->id,
-                            'culture_id' => $culture->id,
-                        ]);
-
-                    DB::table('cms.product_cultures_product_links')
-                        ->insert([
-                            'product_culture_id' => $productCulture->id,
-                            'product_id' => $product->id,
-                        ]);
-                }
+                $productCulture = ProductCulture::query()
+                    ->where("product_id", $product->id)
+                    ->where("culture_id", $culture->id)
+                    ->firstOrNew();
+                $productCulture->product_id = $product->id;
+                $productCulture->culture_id = $culture->id;
+                $productCulture->save();
             }
         }
     }
@@ -367,47 +341,31 @@ class Import extends Command
     {
         $pragueName = self::normalize($item[8]);
         if ($pragueName) {
-            $prague = Prague::whereRaw("lower(scientific_name) = ?", strtolower($pragueName))->firstOrNew();
+            $prague = Prague::query()
+                ->whereRaw("lower(scientific_name) = ?", strtolower($pragueName))
+                ->firstOrNew();
             $prague->scientific_name = $pragueName;
             $prague->save();
 
-            $record = DB::table('cms.product_pragues_prague_links', "pppl")
-                ->join('cms.product_pragues_product_links as pppl2', "pppl2.product_prague_id", "=", "pppl.product_prague_id")
-                ->where('pppl.prague_id', $prague->id)
-                ->where('pppl2.product_id', $product->id)
-                ->first();
-
-            if (!$record) {
-                $productPrague = new ProductPrague();
-                $productPrague->save();
-
-                DB::table('cms.product_pragues_prague_links')
-                    ->insert([
-                        'product_prague_id' => $productPrague->id,
-                        'prague_id' => $prague->id,
-                    ]);
-
-                DB::table('cms.product_pragues_product_links')
-                    ->insert([
-                        'product_prague_id' => $productPrague->id,
-                        'product_id' => $product->id,
-                    ]);
-            }
+            $productPrague = ProductPrague::query()
+                ->where('product_id', $product->id)
+                ->where('prague_id', $prague->id)
+                ->firstOrNew();
+            $productPrague->product_id = $product->id;
+            $productPrague->prague_id = $prague->id;
+            $productPrague->save();
 
             foreach (self::toArray($item[9]) as $value) {
 
                 $value = preg_replace('/\s*\(\d+\)/', '', $value);
                 if ($value && $value != "-") {
-                    $commomName = PragueCommonName::whereRaw("lower(name) = ?", strtolower($value))->firstOrNew();
+                    $commomName = PragueCommonName::query()
+                        ->whereRaw("lower(name) = ?", strtolower($value))
+                        ->where("prague_id", $prague->id)
+                        ->firstOrNew();
                     $commomName->name = Str::title($value);
+                    $commomName->prague_id = $prague->id;
                     $commomName->save();
-
-                    DB::table('cms.prague_common_names_prague_links')->updateOrInsert(
-                        [
-                            'prague_common_name_id' => $commomName->id,
-                            'prague_id' => $prague->id,
-                        ],
-                    );
                 }
             }
         }
@@ -424,58 +382,38 @@ class Import extends Command
                 $countryName = trim($value[1]);
                 $companyName = trim(str_replace("(", "", $value[0]));
                 $typeName = trim(str_replace(")", "", $value[2]));
-                $typeName = "IMPORTADO" ? "IMPORTADOR" : $typeName;
+                $typeName = $typeName == "IMPORTADO" ? "IMPORTADOR" : $typeName;
 
                 if ($countryName && $companyName && $typeName) {
-                    $country = Country::whereRaw("lower(name) = ?", strtolower($countryName))->firstOrNew();
+                    $country = Country::query()
+                        ->whereRaw("lower(name) = ?", strtolower($countryName))
+                        ->firstOrNew();
                     $country->name = Str::title($countryName);
                     $country->save();
 
-                    $company = Company::whereRaw("lower(name) = ?", strtolower($companyName))->firstOrNew();
+                    $company = Company::query()
+                        ->whereRaw("lower(name) = ?", strtolower($companyName))
+                        ->where("country_id", $country->id)
+                        ->firstOrNew();
                     $company->name = $companyName;
+                    $company->country_id = $country->id;
                     $company->save();
 
-                    DB::table('cms.companies_country_links')->updateOrInsert(
-                        [
-                            'company_id' => $company->id,
-                            'country_id' => $country->id,
-                        ],
-                    );
-
-                    $companyType = CompanyType::whereRaw("lower(name) = ?", $typeName)->firstOrNew();
+                    $companyType = CompanyType::query()
+                        ->whereRaw("lower(name) = ?", $typeName)
+                        ->firstOrNew();
                     $companyType->name = Str::title($typeName);
                     $companyType->save();
 
-                    $record = DB::table('cms.product_companies_company_links', "pccl")
-                        ->join('cms.product_companies_company_type_links as pcctl', "pcctl.product_company_id", "=", "pccl.product_company_id")
-                        ->join('cms.product_companies_product_links as pcpl', "pcpl.product_company_id", "=", "pccl.product_company_id")
-                        ->where('pccl.company_id', $company->id)
-                        ->where('pcctl.company_type_id', $companyType->id)
-                        ->where('pcpl.product_id', $product->id)
-                        ->first();
-
-                    if (!$record) {
-                        $productCompany = new ProductCompany();
-                        $productCompany->save();
-
-                        DB::table('cms.product_companies_company_links')
-                            ->insert([
-                                'product_company_id' => $productCompany->id,
-                                'company_id' => $company->id,
-                            ]);
-
-                        DB::table('cms.product_companies_company_type_links')
-                            ->insert([
-                                'product_company_id' => $productCompany->id,
-                                'company_type_id' => $companyType->id,
-                            ]);
-
-                        DB::table('cms.product_companies_product_links')
-                            ->insert([
-                                'product_company_id' => $productCompany->id,
-                                'product_id' => $product->id,
-                            ]);
-                    }
+                    $productCompany = ProductCompany::query()
+                        ->where("product_id", $product->id)
+                        ->where("company_id", $company->id)
+                        ->where("company_type_id", $companyType->id)
+                        ->firstOrNew();
+                    $productCompany->product_id = $product->id;
+                    $productCompany->company_id = $company->id;
+                    $productCompany->company_type_id = $companyType->id;
+                    $productCompany->save();
                 }
             }
         }
@@ -485,8 +423,8 @@ class Import extends Command
     {
         ProductCompany::query()->forceDelete();
         CompanyType::query()->forceDelete();
-        Country::query()->forceDelete();
         Company::query()->forceDelete();
+        Country::query()->forceDelete();
         PragueCommonName::query()->forceDelete();
         ProductPrague::query()->forceDelete();
         Prague::query()->forceDelete();
