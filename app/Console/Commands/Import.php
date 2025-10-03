@@ -37,8 +37,8 @@ class Import extends Command
     public function handle()
     {
 
-        // $this->adjustCultures();
-        // return;
+        $this->makeTransfer();
+        return;
 
         // $this->unzip();
         $this->clear();
@@ -390,7 +390,7 @@ class Import extends Command
 
                 if (in_array($typeName, ["Form", "Formulador"])) {
                     $typeName = "Formulador";
-                } elseif (in_array($typeName, ["I", "Im", "Imp", "Import", "Importa", "Importad", "Importado","Importador"])) {
+                } elseif (in_array($typeName, ["I", "Im", "Imp", "Import", "Importa", "Importad", "Importado", "Importador"])) {
                     $typeName = "Importador";
                 } elseif (in_array($typeName, ["Man", "Manipulador"])) {
                     $typeName = "Manipulador";
@@ -464,33 +464,31 @@ class Import extends Command
     {
 
         $this->transfer(Formulation::class);
-
-        // ProductCompany::query()->forceDelete();
-        // CompanyType::query()->forceDelete();
-        // Company::query()->forceDelete();
-        // Country::query()->forceDelete();
-        // PragueCommonName::query()->forceDelete();
-        // ProductPrague::query()->forceDelete();
-        // Prague::query()->forceDelete();
-        // ProductCulture::query()->forceDelete();
-        // Culture::query()->forceDelete();
-        // ProductActionMode::query()->forceDelete();
-        // ActionMode::query()->forceDelete();
-        // ProductClass::query()->forceDelete();
-        // AgroClass::query()->forceDelete();
-        // ProductActiveIngredient::query()->forceDelete();
-        // ActiveIngredient::query()->forceDelete();
-        // ChemicalGroup::query()->forceDelete();
-        // ProductBrand::query()->forceDelete();
-        // Product::query()->forceDelete();
-        // EnvironmentalClass::query()->forceDelete();
-        // ToxicologicalClass::query()->forceDelete();
-        // RegistrationHolder::query()->forceDelete();
+        $this->transfer(RegistrationHolder::class);
+        $this->transfer(ToxicologicalClass::class);
+        $this->transfer(EnvironmentalClass::class);
+        $this->transfer(Product::class);
+        $this->transfer(ProductBrand::class);
+        $this->transfer(ChemicalGroup::class);
+        $this->transfer(ActiveIngredient::class);
+        $this->transfer(ProductActiveIngredient::class);
+        $this->transfer(AgroClass::class);
+        $this->transfer(ProductClass::class);
+        $this->transfer(ActionMode::class);
+        $this->transfer(ProductActionMode::class);
+        $this->transfer(Culture::class);
+        $this->transfer(ProductCulture::class);
+        $this->transfer(Prague::class);
+        $this->transfer(ProductPrague::class);
+        $this->transfer(PragueCommonName::class);
+        $this->transfer(Country::class);
+        $this->transfer(Company::class);
+        $this->transfer(CompanyType::class);
+        $this->transfer(ProductCompany::class);
     }
 
     private function transfer($class)
     {
-
         $table = $class::getModel()->getTable();
 
         $rows = DB::connection('mariadb')->table($table)->get();
@@ -499,7 +497,12 @@ class Import extends Command
             return (array) $item;
         })->toArray();
 
-        DB::connection('pgsql')->table('$table')->insert($dados);
+        $lotes = array_chunk($dados, 10000);
+
+        foreach ($lotes as $i => $lote) {
+            DB::connection('supabase')->table($table)->insertOrIgnore($lote);
+            $this->info($table . " lote: " . ($i + 1));
+        }
     }
 
     private function clear()
