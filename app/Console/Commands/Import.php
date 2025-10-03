@@ -36,6 +36,10 @@ class Import extends Command
 
     public function handle()
     {
+
+        // $this->adjustCultures();
+        // return;
+
         // $this->unzip();
         $this->clear();
 
@@ -103,7 +107,7 @@ class Import extends Command
                     $product->is_active = $isActive;
                     $product->is_organic = $isOrganic;
                     $product->register_number = $registerNumber;
-                    $product->formulation_id = $formulation->id;
+                    $product->formulation_id = $formulation ? $formulation->id : null;
                     $product->registration_holder_id = $registrationHolder->id;
                     $product->toxicological_class_id = $toxicologicalClass->id;
                     $product->environmental_class_id = $environmentalClass->id;
@@ -119,8 +123,8 @@ class Import extends Command
                     $this->pragues($product, $item);
                     $this->companies($product, $item);
 
-                    $this->info(var_dump($item));
-                    die();
+                    // $this->info(var_dump($item));
+                    // die();
                 } catch (\Throwable $e) {
                     $raw = implode($delimiter, array_map(
                         fn($v) => is_null($v) ? '' : (string) $v,
@@ -131,6 +135,8 @@ class Import extends Command
                     throw new Exception($msg);
                 }
             }
+
+            $this->adjustCultures();
         } finally {
             if (is_resource($stream)) {
                 fclose($stream);
@@ -182,18 +188,24 @@ class Import extends Command
     {
         $formulationDescription = self::normalize($item[2]);
 
-        $formulation = Formulation::whereRaw("lower(description) = ?", strtolower($formulationDescription))->firstOrNew();
-        $formulation->description = $formulationDescription;
-        $formulation->save();
+        if ($formulationDescription) {
+            $formulation = Formulation::firstOrNew(
+                ['description' => $formulationDescription]
+            );
+            $formulation->save();
 
-        return $formulation;
+            return $formulation;
+        }
+
+        return null;
     }
 
     private function registrationHolder($item)
     {
         $registrationHolderName = self::normalize($item[4]);
-        $registrationHolder = RegistrationHolder::whereRaw("lower(name) = ?", strtolower($registrationHolderName))->firstOrNew();
-        $registrationHolder->name = $registrationHolderName;
+        $registrationHolder = RegistrationHolder::firstOrNew(
+            ['name' => $registrationHolderName]
+        );
         $registrationHolder->save();
 
         return $registrationHolder;
@@ -203,8 +215,10 @@ class Import extends Command
     private function toxicologicalClass($item)
     {
         $toxicologicalClassName = self::normalize($item[11]);
-        $toxicologicalClass = ToxicologicalClass::whereRaw("lower(name) = ?", strtolower($toxicologicalClassName))->firstOrNew();
-        $toxicologicalClass->name = $toxicologicalClassName;
+        $toxicologicalClassName = Str::title($toxicologicalClassName);
+        $toxicologicalClass = ToxicologicalClass::firstOrNew(
+            ['name' => $toxicologicalClassName]
+        );
         $toxicologicalClass->save();
 
         return $toxicologicalClass;
@@ -213,8 +227,10 @@ class Import extends Command
     private function environmentalClass($item)
     {
         $environmentalClassName = self::normalize($item[12]);
-        $environmentalClass = EnvironmentalClass::whereRaw("lower(name) = ?", strtolower($environmentalClassName))->firstOrNew();
-        $environmentalClass->name = $environmentalClassName;
+        $environmentalClassName = Str::title($environmentalClassName);
+        $environmentalClass = EnvironmentalClass::firstOrNew(
+            ['name' => $environmentalClassName]
+        );
         $environmentalClass->save();
 
         return $environmentalClass;
@@ -224,12 +240,11 @@ class Import extends Command
     {
         foreach (self::toArray($item[1]) as $value) {
             if ($value) {
-                $brand = ProductBrand::query()
-                    ->whereRaw("lower(name) = ?", strtolower($value))
-                    ->where("product_id", $product->id)
-                    ->firstOrNew();
-                $brand->product_id = $product->id;
-                $brand->name = $value;
+                $value = Str::title($value);
+                $brand = ProductBrand::firstOrNew([
+                    'product_id' => $product->id,
+                    'name'       => $value,
+                ]);
                 $brand->save();
             }
         }
@@ -244,28 +259,25 @@ class Import extends Command
             $chemicalGroupName = self::normalize(str_replace(")", "", $row[1]));
             $concentration = self::normalize(str_replace(")", "", $row[2]));
             if ($activeIngredientName && $chemicalGroupName && $concentration) {
-                $chemicalGroup = ChemicalGroup::query()
-                    ->whereRaw("lower(name) = ?", strtolower($chemicalGroupName))
-                    ->firstOrNew();
-                $chemicalGroup->name = Str::title($chemicalGroupName);
+                $chemicalGroupName = Str::title($chemicalGroupName);
+                $chemicalGroup = ChemicalGroup::firstOrNew([
+                    'name' => $chemicalGroupName,
+                ]);
                 $chemicalGroup->save();
 
-                $activeIngredient = ActiveIngredient::query()
-                    ->whereRaw("lower(name) = ?", strtolower($activeIngredientName))
-                    ->where("chemical_group_id", $chemicalGroup->id)
-                    ->firstOrNew();
+                $activeIngredientName = Str::title($activeIngredientName);
+                $activeIngredient = ActiveIngredient::firstOrNew([
+                    // 'chemical_group_id' => $chemicalGroup->id,
+                    'name'              => $activeIngredientName,
+                ]);
                 $activeIngredient->chemical_group_id = $chemicalGroup->id;
-                $activeIngredient->name = Str::title($activeIngredientName);
                 $activeIngredient->save();
 
-                $productActiveIngredient = ProductActiveIngredient::query()
-                    ->whereRaw("lower(concentration) = ?", strtolower($concentration))
-                    ->where("product_id", $product->id)
-                    ->where("active_ingredient_id", $activeIngredient->id)
-                    ->firstOrNew();
+                $productActiveIngredient = ProductActiveIngredient::firstOrNew([
+                    'product_id'          => $product->id,
+                    'active_ingredient_id' => $activeIngredient->id,
+                ]);
                 $productActiveIngredient->concentration = $concentration;
-                $productActiveIngredient->product_id = $product->id;
-                $productActiveIngredient->active_ingredient_id = $activeIngredient->id;
                 $productActiveIngredient->save();
             }
         }
@@ -275,16 +287,16 @@ class Import extends Command
     {
         foreach (self::toArray($item[5]) as $value) {
             if ($value) {
-                $agroClass = AgroClass::whereRaw("lower(name) = ?", strtolower($value))->firstOrNew();
-                $agroClass->name = $value;
+                $value = Str::title($value);
+                $agroClass = AgroClass::firstOrNew([
+                    'name' => $value,
+                ]);
                 $agroClass->save();
 
-                $productClass = ProductClass::query()
-                    ->where("product_id", $product->id)
-                    ->where("class_id", $agroClass->id)
-                    ->firstOrNew();
-                $productClass->product_id = $product->id;
-                $productClass->class_id = $agroClass->id;
+                $productClass = ProductClass::firstOrNew([
+                    'product_id' => $product->id,
+                    'class_id'   => $agroClass->id,
+                ]);
                 $productClass->save();
             }
         }
@@ -298,18 +310,16 @@ class Import extends Command
                 $value = str_replace("contao", "contato", $value);
                 $value = str_replace("de ", "", $value);
 
-                $actionMode = ActionMode::query()
-                    ->whereRaw("lower(description) = ?", strtolower($value))
-                    ->firstOrNew();
-                $actionMode->description =  Str::title($value);
+                $value = Str::title($value);
+                $actionMode = ActionMode::firstOrNew([
+                    'description' => $value,
+                ]);
                 $actionMode->save();
 
-                $productActionMode = ProductActionMode::query()
-                    ->where("product_id", $product->id)
-                    ->where("action_mode_id", $actionMode->id)
-                    ->firstOrNew();
-                $productActionMode->product_id = $product->id;
-                $productActionMode->action_mode_id = $actionMode->id;
+                $productActionMode = ProductActionMode::firstOrNew([
+                    'product_id'      => $product->id,
+                    'action_mode_id'  => $actionMode->id,
+                ]);
                 $productActionMode->save();
             }
         }
@@ -317,21 +327,18 @@ class Import extends Command
 
     private function cultures(Product $product, $item)
     {
-        // TODO: todas as culturas
         foreach (self::toArray($item[7]) as $value) {
             if ($value) {
-                $culture = Culture::query()
-                    ->whereRaw("lower(name) = ?", strtolower($value))
-                    ->firstOrNew();
-                $culture->name = $value;
+                $value = Str::title($value);
+                $culture = Culture::firstOrNew([
+                    'name' => $value,
+                ]);
                 $culture->save();
 
-                $productCulture = ProductCulture::query()
-                    ->where("product_id", $product->id)
-                    ->where("culture_id", $culture->id)
-                    ->firstOrNew();
-                $productCulture->product_id = $product->id;
-                $productCulture->culture_id = $culture->id;
+                $productCulture = ProductCulture::firstOrNew([
+                    'product_id' => $product->id,
+                    'culture_id' => $culture->id,
+                ]);
                 $productCulture->save();
             }
         }
@@ -340,31 +347,28 @@ class Import extends Command
     private function pragues(Product $product, $item)
     {
         $pragueName = self::normalize($item[8]);
+        $pragueName = str_replace("(", "", $pragueName);
         if ($pragueName) {
-            $prague = Prague::query()
-                ->whereRaw("lower(scientific_name) = ?", strtolower($pragueName))
-                ->firstOrNew();
-            $prague->scientific_name = $pragueName;
+            $prague = Prague::firstOrNew([
+                'scientific_name' => $pragueName,
+            ]);
             $prague->save();
 
-            $productPrague = ProductPrague::query()
-                ->where('product_id', $product->id)
-                ->where('prague_id', $prague->id)
-                ->firstOrNew();
-            $productPrague->product_id = $product->id;
-            $productPrague->prague_id = $prague->id;
+            $productPrague = ProductPrague::firstOrNew([
+                'product_id' => $product->id,
+                'prague_id'  => $prague->id,
+            ]);
             $productPrague->save();
 
             foreach (self::toArray($item[9]) as $value) {
 
                 $value = preg_replace('/\s*\(\d+\)/', '', $value);
-                if ($value && $value != "-") {
-                    $commomName = PragueCommonName::query()
-                        ->whereRaw("lower(name) = ?", strtolower($value))
-                        ->where("prague_id", $prague->id)
-                        ->firstOrNew();
-                    $commomName->name = Str::title($value);
-                    $commomName->prague_id = $prague->id;
+                if ($value && !in_array($value, ["-", "--", ",", ",", "="])) {
+                    $value = Str::title($value);
+                    $commomName = PragueCommonName::firstOrNew([
+                        'prague_id' => $prague->id,
+                        'name'      => $value,
+                    ]);
                     $commomName->save();
                 }
             }
@@ -382,41 +386,120 @@ class Import extends Command
                 $countryName = trim($value[1]);
                 $companyName = trim(str_replace("(", "", $value[0]));
                 $typeName = trim(str_replace(")", "", $value[2]));
-                $typeName = $typeName == "IMPORTADO" ? "IMPORTADOR" : $typeName;
+                $typeName = Str::title($typeName);
+
+                if (in_array($typeName, ["Form", "Formulador"])) {
+                    $typeName = "Formulador";
+                } elseif (in_array($typeName, ["I", "Im", "Imp", "Import", "Importa", "Importad", "Importado","Importador"])) {
+                    $typeName = "Importador";
+                } elseif (in_array($typeName, ["Man", "Manipulador"])) {
+                    $typeName = "Manipulador";
+                }
 
                 if ($countryName && $companyName && $typeName) {
-                    $country = Country::query()
-                        ->whereRaw("lower(name) = ?", strtolower($countryName))
-                        ->firstOrNew();
-                    $country->name = Str::title($countryName);
+                    $countryName = Str::title($countryName);
+                    $country = Country::firstOrNew(
+                        ['name' => $countryName]
+                    );
                     $country->save();
 
-                    $company = Company::query()
-                        ->whereRaw("lower(name) = ?", strtolower($companyName))
-                        ->where("country_id", $country->id)
-                        ->firstOrNew();
-                    $company->name = $companyName;
-                    $company->country_id = $country->id;
+                    $companyName = Str::title($companyName);
+                    $company = Company::firstOrNew([
+                        'country_id' => $country->id,
+                        'name'       => $companyName,
+                    ]);
                     $company->save();
 
-                    $companyType = CompanyType::query()
-                        ->whereRaw("lower(name) = ?", $typeName)
-                        ->firstOrNew();
-                    $companyType->name = Str::title($typeName);
+                    $companyType = CompanyType::firstOrNew(
+                        ['name' => $typeName]
+                    );
                     $companyType->save();
 
-                    $productCompany = ProductCompany::query()
-                        ->where("product_id", $product->id)
-                        ->where("company_id", $company->id)
-                        ->where("company_type_id", $companyType->id)
-                        ->firstOrNew();
-                    $productCompany->product_id = $product->id;
-                    $productCompany->company_id = $company->id;
-                    $productCompany->company_type_id = $companyType->id;
+                    $productCompany = ProductCompany::firstOrNew([
+                        'product_id'      => $product->id,
+                        'company_id'      => $company->id,
+                        'company_type_id' => $companyType->id,
+                    ]);
                     $productCompany->save();
                 }
             }
         }
+    }
+
+    private function adjustCultures()
+    {
+        $culture = Culture::query()
+            ->where("name", "Todas As Culturas")
+            ->first();
+
+        if ($culture) {
+            $cultures = Culture::query()
+                ->where("id", "!=", $culture->id)
+                ->get();
+
+            if ($cultures) {
+                $products = ProductCulture::query()
+                    ->where("culture_id", $culture->id)
+                    ->get();
+
+                if ($products) {
+                    foreach ($products as $product) {
+                        foreach ($cultures as $c) {
+                            $pc = ProductCulture::query()
+                                ->where("product_id", $product->product_id)
+                                ->where("culture_id", $c->id)
+                                ->firstOrNew();
+                            $pc->product_id = $product->product_id;
+                            $pc->culture_id = $c->id;
+                            $pc->save();
+                        }
+                        $product->delete();
+                    }
+                }
+            }
+            $culture->delete();
+        }
+    }
+    private function makeTransfer()
+    {
+
+        $this->transfer(Formulation::class);
+
+        // ProductCompany::query()->forceDelete();
+        // CompanyType::query()->forceDelete();
+        // Company::query()->forceDelete();
+        // Country::query()->forceDelete();
+        // PragueCommonName::query()->forceDelete();
+        // ProductPrague::query()->forceDelete();
+        // Prague::query()->forceDelete();
+        // ProductCulture::query()->forceDelete();
+        // Culture::query()->forceDelete();
+        // ProductActionMode::query()->forceDelete();
+        // ActionMode::query()->forceDelete();
+        // ProductClass::query()->forceDelete();
+        // AgroClass::query()->forceDelete();
+        // ProductActiveIngredient::query()->forceDelete();
+        // ActiveIngredient::query()->forceDelete();
+        // ChemicalGroup::query()->forceDelete();
+        // ProductBrand::query()->forceDelete();
+        // Product::query()->forceDelete();
+        // EnvironmentalClass::query()->forceDelete();
+        // ToxicologicalClass::query()->forceDelete();
+        // RegistrationHolder::query()->forceDelete();
+    }
+
+    private function transfer($class)
+    {
+
+        $table = $class::getModel()->getTable();
+
+        $rows = DB::connection('mariadb')->table($table)->get();
+
+        $dados = $rows->map(function ($item) {
+            return (array) $item;
+        })->toArray();
+
+        DB::connection('pgsql')->table('$table')->insert($dados);
     }
 
     private function clear()
