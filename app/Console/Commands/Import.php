@@ -37,8 +37,8 @@ class Import extends Command
     public function handle()
     {
 
-        $this->makeTransfer();
-        return;
+        // $this->makeTransfer();
+        // return;
 
         // $this->unzip();
         $this->clear();
@@ -137,6 +137,7 @@ class Import extends Command
             }
 
             $this->adjustCultures();
+            $this->makeTransfer();
         } finally {
             if (is_resource($stream)) {
                 fclose($stream);
