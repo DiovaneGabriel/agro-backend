@@ -14,22 +14,38 @@ services:
         networks:
             agro:
         depends_on:
-            - mariadb
+            # - mariadb
+            - postgres
 
-    mariadb:
-        image: mariadb:11.3.2
-        container_name: "agro-mariadb"
-        volumes:
-            - agro-mariadb-data:/var/lib/mysql
-            - .docker/mariadb/scripts:/docker-entrypoint-initdb.d
-            - .docker/mariadb/config/50-server.cnf:/etc/mysql/mariadb.conf.d/50-server.cnf
+    # mariadb:
+    #     image: mariadb:11.3.2
+    #     container_name: "agro-mariadb"
+    #     volumes:
+    #         - agro-mariadb-data:/var/lib/mysql
+    #         - .docker/mariadb/scripts:/docker-entrypoint-initdb.d
+    #         - .docker/mariadb/config/50-server.cnf:/etc/mysql/mariadb.conf.d/50-server.cnf
+    #     ports:
+    #         - 3306:3306
+    #     environment:
+    #         MYSQL_PASSWORD: agro
+    #         MYSQL_ROOT_PASSWORD: agro
+    #     command: --init-file /docker-entrypoint-initdb.d/create-database.sql
+    #     restart: unless-stopped
+    #     networks:
+    #         agro:
+
+    postgres:
+        image: postgres:15.0
+        shm_size: 1g
+        container_name: agro-postgres
         ports:
-            - 3306:3306
+            - "5432:5432"
         environment:
-            MYSQL_PASSWORD: agro
-            MYSQL_ROOT_PASSWORD: agro
-        command: --init-file /docker-entrypoint-initdb.d/create-database.sql
-        restart: unless-stopped
+            POSTGRES_DB: agro
+            POSTGRES_USER: agro
+            POSTGRES_PASSWORD: agro
+        volumes:
+            - agro-postgre-data:/var/lib/postgresql/data
         networks:
             agro:
 
@@ -38,4 +54,5 @@ networks:
         external: true
 
 volumes:
-    agro-mariadb-data:
+    # agro-mariadb-data:
+    agro-postgre-data:

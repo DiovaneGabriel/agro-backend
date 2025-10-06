@@ -37,8 +37,8 @@ class Import extends Command
     public function handle()
     {
 
-        // $this->makeTransfer();
-        // return;
+        $this->makeTransfer();
+        return;
 
         // $this->unzip();
         $this->clear();

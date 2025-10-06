@@ -103,6 +103,21 @@ return [
             ]) : [],
         ],
 
+        'pgsql' => [
+            'driver' => 'pgsql',
+            'url' => env('SUPABASE_URL'),
+            'host' => env('SUPABASE_HOST', '127.0.0.1'),
+            'port' => env('SUPABASE_PORT', '5432'),
+            'database' => env('SUPABASE_DATABASE', 'laravel'),
+            'username' => env('SUPABASE_USERNAME', 'root'),
+            'password' => env('SUPABASE_PASSWORD', ''),
+            'charset' => env('SUPABASE_CHARSET', 'utf8'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => 'public',
+            'sslmode' => env('SUPABASE_PGSSLMODE', 'prefer'),
+        ],
+
         'supabase' => [
             'driver' => 'pgsql',
             'url' => env('SUPABASE_URL'),
