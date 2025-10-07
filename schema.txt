@@ -2,11 +2,6 @@ chemical_groups
 	id
 	name
 
-active_ingredients
-	id
-	name
-	chemical_group_id
-
 classes
 	id
 	name
@@ -14,6 +9,19 @@ classes
 action_mechanisms
 	id
 	name
+	HRAC --Herbicide Resistance Action Committee
+	WSSA --Weed Science Society of America
+
+active_ingredients
+	id
+	name
+	chemical_group_id
+
+active_ingredient_action_mechanisms
+	id
+	active_ingredient_id
+	class_id
+	action_mechanism_id
 
 action_modes
 	id
@@ -70,8 +78,6 @@ products
 	registration_holder_id
 	toxicological_class_id
 	environmental_class_id
-	HRAC --Herbicide Resistance Action Committee
-	WSSA --Weed Science Society of America
 
 product_brands
 	id
@@ -88,7 +94,6 @@ product_classes
 	id
 	product_id
 	class_id
-	action_mechanism_id
 
 product_action_modes
 	id

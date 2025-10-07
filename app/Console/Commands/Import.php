@@ -26,7 +26,6 @@ use App\Models\RegistrationHolder;
 use App\Models\ToxicologicalClass;
 use Exception;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class Import extends Command
@@ -36,9 +35,6 @@ class Import extends Command
 
     public function handle()
     {
-
-        $this->makeTransfer();
-        return;
 
         // $this->unzip();
         $this->clear();
@@ -93,9 +89,9 @@ class Import extends Command
                     $item = array_values($item);
 
                     $id = $item[15];
-                    $isOrganic = self::normalize($item[13]) != 'NÃO' ? true : false;
-                    $isActive = self::normalize($item[14]) != 'TRUE' ? false : true;
-                    $registerNumber = self::normalize($item[0]);
+                    $isOrganic = normalize($item[13]) != 'NÃO' ? true : false;
+                    $isActive = normalize($item[14]) != 'TRUE' ? false : true;
+                    $registerNumber = normalize($item[0]);
 
                     $formulation = $this->formulation($item);
                     $registrationHolder = $this->registrationHolder($item);
@@ -137,7 +133,6 @@ class Import extends Command
             }
 
             $this->adjustCultures();
-            $this->makeTransfer();
         } finally {
             if (is_resource($stream)) {
                 fclose($stream);
@@ -146,28 +141,6 @@ class Import extends Command
 
         $this->info('✅ Migração dos dados finalizada.');
         return 0;
-    }
-
-    private static function normalize($value)
-    {
-        $value = mb_convert_encoding($value, 'UTF-8', 'UTF-8, ISO-8859-1, Windows-1252');
-        $value = str_replace(".", "", $value);
-        $value = trim($value);
-        // $value = Str::title($value);
-
-        return $value;
-    }
-
-    private static function toArray($value, array $separators = [" E ", " e ", ", ", "/", ";"])
-    {
-        foreach ($separators as $separator) {
-            $value = str_replace($separator, "+", $value);
-        }
-
-        $array = explode("+", $value);
-        $array = array_map(fn($v) => self::normalize($v), $array);
-
-        return $array;
     }
 
     private function unzip()
@@ -187,7 +160,7 @@ class Import extends Command
 
     private function formulation($item)
     {
-        $formulationDescription = self::normalize($item[2]);
+        $formulationDescription = normalize($item[2]);
 
         if ($formulationDescription) {
             $formulation = Formulation::firstOrNew(
@@ -203,7 +176,7 @@ class Import extends Command
 
     private function registrationHolder($item)
     {
-        $registrationHolderName = self::normalize($item[4]);
+        $registrationHolderName = normalize($item[4]);
         $registrationHolder = RegistrationHolder::firstOrNew(
             ['name' => $registrationHolderName]
         );
@@ -215,7 +188,7 @@ class Import extends Command
 
     private function toxicologicalClass($item)
     {
-        $toxicologicalClassName = self::normalize($item[11]);
+        $toxicologicalClassName = normalize($item[11]);
         $toxicologicalClassName = Str::title($toxicologicalClassName);
         $toxicologicalClass = ToxicologicalClass::firstOrNew(
             ['name' => $toxicologicalClassName]
@@ -227,7 +200,7 @@ class Import extends Command
 
     private function environmentalClass($item)
     {
-        $environmentalClassName = self::normalize($item[12]);
+        $environmentalClassName = normalize($item[12]);
         $environmentalClassName = Str::title($environmentalClassName);
         $environmentalClass = EnvironmentalClass::firstOrNew(
             ['name' => $environmentalClassName]
@@ -239,7 +212,7 @@ class Import extends Command
 
     private function brands(Product $product, $item)
     {
-        foreach (self::toArray($item[1]) as $value) {
+        foreach (toArray($item[1]) as $value) {
             if ($value) {
                 $value = Str::title($value);
                 $brand = ProductBrand::firstOrNew([
@@ -253,12 +226,12 @@ class Import extends Command
 
     private function activeIngredients(Product $product, $item)
     {
-        foreach (self::toArray($item[3], ["+"]) as $row) {
+        foreach (toArray($item[3], ["+"]) as $row) {
             $row = explode("(", $row);
 
-            $activeIngredientName = self::normalize(str_replace(")", "", $row[0]));
-            $chemicalGroupName = self::normalize(str_replace(")", "", $row[1]));
-            $concentration = self::normalize(str_replace(")", "", $row[2]));
+            $activeIngredientName = normalize(str_replace(")", "", $row[0]));
+            $chemicalGroupName = normalize(str_replace(")", "", $row[1]));
+            $concentration = normalize(str_replace(")", "", $row[2]));
             if ($activeIngredientName && $chemicalGroupName && $concentration) {
                 $chemicalGroupName = Str::title($chemicalGroupName);
                 $chemicalGroup = ChemicalGroup::firstOrNew([
@@ -286,7 +259,7 @@ class Import extends Command
 
     private function classes(Product $product, $item)
     {
-        foreach (self::toArray($item[5]) as $value) {
+        foreach (toArray($item[5]) as $value) {
             if ($value) {
                 $value = Str::title($value);
                 $agroClass = AgroClass::firstOrNew([
@@ -305,7 +278,7 @@ class Import extends Command
 
     private function actionMode(Product $product, $item)
     {
-        foreach (self::toArray($item[6]) as $value) {
+        foreach (toArray($item[6]) as $value) {
             if (trim($value)) {
                 $value = strtolower($value);
                 $value = str_replace("contao", "contato", $value);
@@ -328,7 +301,7 @@ class Import extends Command
 
     private function cultures(Product $product, $item)
     {
-        foreach (self::toArray($item[7]) as $value) {
+        foreach (toArray($item[7]) as $value) {
             if ($value) {
                 $value = Str::title($value);
                 $culture = Culture::firstOrNew([
@@ -347,7 +320,7 @@ class Import extends Command
 
     private function pragues(Product $product, $item)
     {
-        $pragueName = self::normalize($item[8]);
+        $pragueName = normalize($item[8]);
         $pragueName = str_replace("(", "", $pragueName);
         if ($pragueName) {
             $prague = Prague::firstOrNew([
@@ -361,7 +334,7 @@ class Import extends Command
             ]);
             $productPrague->save();
 
-            foreach (self::toArray($item[9]) as $value) {
+            foreach (toArray($item[9]) as $value) {
 
                 $value = preg_replace('/\s*\(\d+\)/', '', $value);
                 if ($value && !in_array($value, ["-", "--", ",", ",", "="])) {
@@ -378,7 +351,7 @@ class Import extends Command
 
     private function companies(Product $product, $item)
     {
-        foreach (self::toArray($item[10], ["+"]) as $value) {
+        foreach (toArray($item[10], ["+"]) as $value) {
             $value = str_replace("<", "+", $value);
             $value = str_replace(">", "+", $value);
             $value = explode("+", $value);
@@ -459,50 +432,6 @@ class Import extends Command
                 }
             }
             $culture->delete();
-        }
-    }
-    private function makeTransfer()
-    {
-
-        $this->transfer(Formulation::class);
-        $this->transfer(RegistrationHolder::class);
-        $this->transfer(ToxicologicalClass::class);
-        $this->transfer(EnvironmentalClass::class);
-        $this->transfer(Product::class);
-        $this->transfer(ProductBrand::class);
-        $this->transfer(ChemicalGroup::class);
-        $this->transfer(ActiveIngredient::class);
-        $this->transfer(ProductActiveIngredient::class);
-        $this->transfer(AgroClass::class);
-        $this->transfer(ProductClass::class);
-        $this->transfer(ActionMode::class);
-        $this->transfer(ProductActionMode::class);
-        $this->transfer(Culture::class);
-        $this->transfer(ProductCulture::class);
-        $this->transfer(Prague::class);
-        $this->transfer(ProductPrague::class);
-        $this->transfer(PragueCommonName::class);
-        $this->transfer(Country::class);
-        $this->transfer(Company::class);
-        $this->transfer(CompanyType::class);
-        $this->transfer(ProductCompany::class);
-    }
-
-    private function transfer($class)
-    {
-        $table = $class::getModel()->getTable();
-
-        $rows = DB::connection('mariadb')->table($table)->get();
-
-        $dados = $rows->map(function ($item) {
-            return (array) $item;
-        })->toArray();
-
-        $lotes = array_chunk($dados, 10000);
-
-        foreach ($lotes as $i => $lote) {
-            DB::connection('supabase')->table($table)->insertOrIgnore($lote);
-            $this->info($table . " lote: " . ($i + 1));
         }
     }
 

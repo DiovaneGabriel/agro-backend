@@ -36,3 +36,11 @@ migrate-undo:
 import:
 	clear && \
 	docker exec -it ${CONTAINER_PHP} sh -c "php artisan import:agrofit"
+
+import-action-mechanism:
+	clear && \
+	docker exec -it ${CONTAINER_PHP} sh -c "php artisan import:action-mechanism"
+
+transfer:
+	clear && \
+	docker exec -it ${CONTAINER_PHP} sh -c "php artisan transfer:agrofit"
