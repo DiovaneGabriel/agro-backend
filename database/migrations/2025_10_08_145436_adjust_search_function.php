@@ -35,16 +35,17 @@ end$$;");
     p_culture_id cultures.id%type,
     p_class_id classes.id%type,
     p_prague_id pragues.id%type,
-    p_prague_common_name_id prague_common_names.id%type,
+    p_common_prague_id common_pragues.id%type,
     p_action_mechanism_id action_mechanisms.id%type,
     p_active_ingredient_id active_ingredients.id%type,
     p_action_mode_id action_modes.id%type,
-    p_registration_holder_id products.registration_holder_id%type,--essa é nova
+    p_registration_holder_id products.registration_holder_id%type,
     p_toxicological_class_id toxicological_classes.id%type,
     p_environmental_class_id environmental_classes.id%type
 )
 returns table (
   id products.id%type,
+  brand_id product_brands.id%type,
   brand_name product_brands.name%type,
   active_ingredients text,
   action_mechanism action_mechanisms.name%type,
@@ -67,6 +68,7 @@ select pai.product_id,
 _products as (
   select
       p.id,
+      pb.id as brand_id,
       pb.name as brand_name,
       string_agg(
         concat(ai.name,' (',pai.concentration,')'),
@@ -84,11 +86,15 @@ _products as (
   left join product_active_ingredients pai on pai.product_id = p.id
   left join active_ingredients ai on ai.id = pai.active_ingredient_id
   left join _action_mechanisms am on am.product_id = p.id
-  group by p.id, pb.name, am.action_mechanism_names
+  group by p.id,
+           pb.id,
+           pb.name,
+           am.action_mechanism_names
 )
 
 select
     p.id,
+    p.brand_id,
     p.brand_name,
     p.active_ingredients,
     p.action_mechanism_names,
@@ -117,11 +123,11 @@ where length(p_search) >= 3
         where pp.prague_id = p_prague_id
           and p.id = pp.product_id
   ))
-  and (p_prague_common_name_id is null or exists (
+  and (p_common_prague_id is null or exists (
         select 1
         from product_pragues pp
         join prague_common_names pcn on pcn.prague_id = pp.prague_id
-        where pcn.id = p_prague_common_name_id
+        where pcn.common_prague_id = p_common_prague_id
           and p.id = pp.product_id
   ))
   and (p_action_mechanism_id is null or exists (

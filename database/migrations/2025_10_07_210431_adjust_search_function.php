@@ -45,6 +45,7 @@ end$$;");
 )
 returns table (
   id products.id%type,
+  brand_id product_brands.id%type,
   brand_name product_brands.name%type,
   active_ingredients text,
   action_mechanism action_mechanisms.name%type,
@@ -67,6 +68,7 @@ select pai.product_id,
 _products as (
   select
       p.id,
+      pb.id as brand_id,
       pb.name as brand_name,
       string_agg(
         concat(ai.name,' (',pai.concentration,')'),
@@ -84,11 +86,15 @@ _products as (
   left join product_active_ingredients pai on pai.product_id = p.id
   left join active_ingredients ai on ai.id = pai.active_ingredient_id
   left join _action_mechanisms am on am.product_id = p.id
-  group by p.id, pb.name, am.action_mechanism_names
+  group by p.id,
+           pb.id,
+           pb.name,
+           am.action_mechanism_names
 )
 
 select
     p.id,
+    p.brand_id,
     p.brand_name,
     p.active_ingredients,
     p.action_mechanism_names,

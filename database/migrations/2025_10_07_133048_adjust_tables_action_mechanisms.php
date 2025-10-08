@@ -115,27 +115,27 @@ return new class extends Migration
         if (Schema::hasTable('action_mechanisms')) {
             Schema::table('action_mechanisms', function (Blueprint $table) {
                 if (Schema::hasColumn('action_mechanisms', 'wssa')) {
-                    try {
-                        $table->dropIndex(['wssa']);
-                    } catch (\Throwable $e) {
-                    }
-                    try {
-                        $table->dropUnique(['wssa']);
-                    } catch (\Throwable $e) {
-                    }
-                    $table->dropColumn('wssa');
+                    // $table->dropIndex(['wssa']);
+                    // $table->dropUnique(['wssa']);
+                    // try {
+                    // } catch (\Throwable $e) {
+                    // }
+                    // try {
+                    // } catch (\Throwable $e) {
+                    // }
+                    // $table->dropColumn('wssa');
                 }
-                if (Schema::hasColumn('action_mechanisms', 'hrac')) {
-                    try {
-                        $table->dropIndex(['hrac']);
-                    } catch (\Throwable $e) {
-                    }
-                    try {
-                        $table->dropUnique(['hrac']);
-                    } catch (\Throwable $e) {
-                    }
-                    $table->dropColumn('hrac');
-                }
+                // if (Schema::hasColumn('action_mechanisms', 'hrac')) {
+                //     try {
+                //         $table->dropIndex(['hrac']);
+                //     } catch (\Throwable $e) {
+                //     }
+                //     try {
+                //         $table->dropUnique(['hrac']);
+                //     } catch (\Throwable $e) {
+                //     }
+                //     $table->dropColumn('hrac');
+                // }
             });
         }
 

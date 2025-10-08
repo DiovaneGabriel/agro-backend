@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class PragueCommonName extends Model
 {
     // protected $connection = 'cms';
-    protected $fillable = ['prague_id', 'name'];
+    protected $fillable = ['prague_id', 'common_prague_id'];
 
     public function prague(): BelongsTo
     {

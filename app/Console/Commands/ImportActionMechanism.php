@@ -3,32 +3,11 @@
 namespace App\Console\Commands;
 
 use App\Models\ActionMechanism;
-use App\Models\ActionMode;
 use App\Models\ActiveIngredient;
 use App\Models\ActiveIngredientActionMechanisms;
 use App\Models\AgroClass;
-use App\Models\ChemicalGroup;
-use App\Models\Company;
-use App\Models\CompanyType;
-use App\Models\Country;
-use App\Models\Culture;
-use App\Models\EnvironmentalClass;
-use App\Models\Formulation;
-use App\Models\Prague;
-use App\Models\PragueCommonName;
-use App\Models\Product;
-use App\Models\ProductActionMode;
-use App\Models\ProductActiveIngredient;
-use App\Models\ProductBrand;
-use App\Models\ProductClass;
-use App\Models\ProductCompany;
-use App\Models\ProductCulture;
-use App\Models\ProductPrague;
-use App\Models\RegistrationHolder;
-use App\Models\ToxicologicalClass;
 use Exception;
 use Illuminate\Console\Command;
-use Illuminate\Support\Str;
 
 class ImportActionMechanism extends Command
 {
@@ -38,7 +17,7 @@ class ImportActionMechanism extends Command
     public function handle()
     {
 
-        $path = storage_path('app/private/action_mechanism_herbicide.csv'); // caminho físico
+        $path = storage_path('app/private/action_mechanism_herbicide.csv');
         $delimiter = ',';
 
         $stream = @fopen($path, 'r');

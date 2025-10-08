@@ -39,7 +39,7 @@ import:
 
 import-action-mechanism:
 	clear && \
-	docker exec -it ${CONTAINER_PHP} sh -c "php artisan import:action-mechanism"
+	docker exec -it ${CONTAINER_PHP} sh -c "php artisan imp:action-mechanism"
 
 transfer:
 	clear && \

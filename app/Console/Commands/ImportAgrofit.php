@@ -4,8 +4,10 @@ namespace App\Console\Commands;
 
 use App\Models\ActionMode;
 use App\Models\ActiveIngredient;
+use App\Models\ActiveIngredientActionMechanisms;
 use App\Models\AgroClass;
 use App\Models\ChemicalGroup;
+use App\Models\CommonPrague;
 use App\Models\Company;
 use App\Models\CompanyType;
 use App\Models\Country;
@@ -28,7 +30,7 @@ use Exception;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
 
-class Import extends Command
+class ImportAgrofit extends Command
 {
     protected $signature = 'import:agrofit';
     protected $description = 'Copia os dados do agrofit';
@@ -65,71 +67,69 @@ class Import extends Command
                     continue;
                 }
 
-                try {
-                    // Pad se vier com menos colunas
-                    if (count($row) < count($header)) {
-                        $row = array_pad($row, count($header), null);
-                    }
-
-                    // Se vier com mais colunas, avisa/erra (opcional: truncar)
-                    if (count($row) > count($header)) {
-                        throw new \RuntimeException(sprintf(
-                            'Quantidade de colunas maior que o header: esperado %d, recebido %d',
-                            count($header),
-                            count($row)
-                        ));
-                    }
-
-                    // array_combine seguro
-                    $item = @array_combine($header, $row);
-                    if ($item === false) {
-                        throw new \RuntimeException('Falha ao combinar header com a linha (array_combine retornou false).');
-                    }
-
-                    $item = array_values($item);
-
-                    $id = $item[15];
-                    $isOrganic = normalize($item[13]) != 'NÃO' ? true : false;
-                    $isActive = normalize($item[14]) != 'TRUE' ? false : true;
-                    $registerNumber = normalize($item[0]);
-
-                    $formulation = $this->formulation($item);
-                    $registrationHolder = $this->registrationHolder($item);
-                    $toxicologicalClass = $this->toxicologicalClass($item);
-                    $environmentalClass = $this->environmentalClass($item);
-
-                    $product = Product::where('id', $id)->firstOrNew();
-                    $product->id = $id;
-                    $product->is_active = $isActive;
-                    $product->is_organic = $isOrganic;
-                    $product->register_number = $registerNumber;
-                    $product->formulation_id = $formulation ? $formulation->id : null;
-                    $product->registration_holder_id = $registrationHolder->id;
-                    $product->toxicological_class_id = $toxicologicalClass->id;
-                    $product->environmental_class_id = $environmentalClass->id;
-                    // $product->HRAC
-                    // $product->WSSA
-                    $product->save();
-
-                    $this->brands($product, $item);
-                    $this->activeIngredients($product, $item);
-                    $this->classes($product, $item);
-                    $this->actionMode($product, $item);
-                    $this->cultures($product, $item);
-                    $this->pragues($product, $item);
-                    $this->companies($product, $item);
-
-                    // $this->info(var_dump($item));
-                    // die();
-                } catch (\Throwable $e) {
-                    $raw = implode($delimiter, array_map(
-                        fn($v) => is_null($v) ? '' : (string) $v,
-                        $row
-                    ));
-
-                    $msg = "Erro na linha {$line}: {$e->getMessage()} | Conteúdo: {$raw}";
-                    throw new Exception($msg);
+                // try {
+                // Pad se vier com menos colunas
+                if (count($row) < count($header)) {
+                    $row = array_pad($row, count($header), null);
                 }
+
+                // Se vier com mais colunas, avisa/erra (opcional: truncar)
+                if (count($row) > count($header)) {
+                    throw new \RuntimeException(sprintf(
+                        'Quantidade de colunas maior que o header: esperado %d, recebido %d',
+                        count($header),
+                        count($row)
+                    ));
+                }
+
+                // array_combine seguro
+                $item = @array_combine($header, $row);
+                if ($item === false) {
+                    throw new \RuntimeException('Falha ao combinar header com a linha (array_combine retornou false).');
+                }
+
+                $item = array_values($item);
+
+                $id = $item[15];
+                $isOrganic = normalize($item[13]) != 'NÃO' ? true : false;
+                $isActive = normalize($item[14]) != 'TRUE' ? false : true;
+                $registerNumber = normalize($item[0]);
+
+                $formulation = $this->formulation($item);
+                $registrationHolder = $this->registrationHolder($item);
+                $toxicologicalClass = $this->toxicologicalClass($item);
+                $environmentalClass = $this->environmentalClass($item);
+
+                $product = Product::where('id', $id)->firstOrNew();
+                $product->id = $id;
+                $product->is_active = $isActive;
+                $product->is_organic = $isOrganic;
+                $product->register_number = $registerNumber;
+                $product->formulation_id = $formulation ? $formulation->id : null;
+                $product->registration_holder_id = $registrationHolder->id;
+                $product->toxicological_class_id = $toxicologicalClass->id;
+                $product->environmental_class_id = $environmentalClass->id;
+                $product->save();
+
+                $this->brands($product, $item);
+                $this->activeIngredients($product, $item);
+                $this->classes($product, $item);
+                $this->actionMode($product, $item);
+                $this->cultures($product, $item);
+                $this->pragues($product, $item);
+                $this->companies($product, $item);
+
+                // $this->info(var_dump($item));
+                // die();
+                // } catch (\Throwable $e) {
+                //     $raw = implode($delimiter, array_map(
+                //         fn($v) => is_null($v) ? '' : (string) $v,
+                //         $row
+                //     ));
+
+                //     $msg = "Erro na linha {$line}: {$e->getMessage()} | Conteúdo: {$raw}";
+                //     throw new Exception($msg);
+                // }
             }
 
             $this->adjustCultures();
@@ -327,21 +327,31 @@ class Import extends Command
                 'scientific_name' => $pragueName,
             ]);
             $prague->save();
-
+            
             $productPrague = ProductPrague::firstOrNew([
                 'product_id' => $product->id,
                 'prague_id'  => $prague->id,
             ]);
             $productPrague->save();
-
+            
             foreach (toArray($item[9]) as $value) {
-
+                
                 $value = preg_replace('/\s*\(\d+\)/', '', $value);
+                $value = str_replace("-", " ", $value);
                 if ($value && !in_array($value, ["-", "--", ",", ",", "="])) {
+                    
                     $value = Str::title($value);
+                    $value = str_replace("Acaro", "Ácaro", $value);
+                    $value = str_replace("Àcaro", "Ácaro", $value);
+                    
+                    $commonPrague = CommonPrague::firstOrNew([
+                        'name' => $value,
+                    ]);
+                    $commonPrague->save();
+                    
                     $commomName = PragueCommonName::firstOrNew([
                         'prague_id' => $prague->id,
-                        'name'      => $value,
+                        'common_prague_id' => $commonPrague->id,
                     ]);
                     $commomName->save();
                 }
@@ -442,12 +452,14 @@ class Import extends Command
         Company::query()->forceDelete();
         Country::query()->forceDelete();
         PragueCommonName::query()->forceDelete();
+        CommonPrague::query()->forceDelete();
         ProductPrague::query()->forceDelete();
         Prague::query()->forceDelete();
         ProductCulture::query()->forceDelete();
         Culture::query()->forceDelete();
         ProductActionMode::query()->forceDelete();
         ActionMode::query()->forceDelete();
+        ActiveIngredientActionMechanisms::query()->forceDelete();
         ProductClass::query()->forceDelete();
         AgroClass::query()->forceDelete();
         ProductActiveIngredient::query()->forceDelete();

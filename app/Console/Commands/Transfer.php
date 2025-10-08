@@ -8,6 +8,7 @@ use App\Models\ActiveIngredient;
 use App\Models\ActiveIngredientActionMechanisms;
 use App\Models\AgroClass;
 use App\Models\ChemicalGroup;
+use App\Models\CommonPrague;
 use App\Models\Company;
 use App\Models\CompanyType;
 use App\Models\Country;
@@ -29,7 +30,7 @@ use App\Models\ToxicologicalClass;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
-class Import extends Command
+class Transfer extends Command
 {
     protected $signature = 'transfer:agrofit';
     protected $description = 'Transfere os dados entre bancos';
@@ -62,6 +63,7 @@ class Import extends Command
         $this->transfer(Culture::class);
         $this->transfer(ProductCulture::class);
         $this->transfer(Prague::class);
+        $this->transfer(CommonPrague::class);
         $this->transfer(ProductPrague::class);
         $this->transfer(PragueCommonName::class);
         $this->transfer(Country::class);

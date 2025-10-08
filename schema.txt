@@ -35,10 +35,14 @@ pragues
 	id
 	scientific_name
 
+common_pragues
+	id
+	name
+
 prague_common_names
 	id
 	prague_id
-	name
+	common_prague_id
 
 countries
 	id
