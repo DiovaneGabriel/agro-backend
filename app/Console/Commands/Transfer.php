@@ -37,11 +37,41 @@ class Transfer extends Command
 
     public function handle()
     {
-
+        $this->clear();
         $this->makeTransfer();
 
         $this->info('✅ Transferencia de dados finalizada.');
         return 0;
+    }
+
+    private function clear()
+    {
+        DB::setDefaultConnection('supabase');
+
+        ProductCompany::query()->forceDelete();
+        CompanyType::query()->forceDelete();
+        Company::query()->forceDelete();
+        Country::query()->forceDelete();
+        PragueCommonName::query()->forceDelete();
+        CommonPrague::query()->forceDelete();
+        ProductPrague::query()->forceDelete();
+        Prague::query()->forceDelete();
+        ProductCulture::query()->forceDelete();
+        Culture::query()->forceDelete();
+        ProductActionMode::query()->forceDelete();
+        ActionMode::query()->forceDelete();
+        ActiveIngredientActionMechanisms::query()->forceDelete();
+        ProductClass::query()->forceDelete();
+        AgroClass::query()->forceDelete();
+        ProductActiveIngredient::query()->forceDelete();
+        ActiveIngredient::query()->forceDelete();
+        ChemicalGroup::query()->forceDelete();
+        ProductBrand::query()->forceDelete();
+        Product::query()->forceDelete();
+        EnvironmentalClass::query()->forceDelete();
+        ToxicologicalClass::query()->forceDelete();
+        RegistrationHolder::query()->forceDelete();
+        Formulation::query()->forceDelete();
     }
 
     private function makeTransfer()

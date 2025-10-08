@@ -327,28 +327,29 @@ class ImportAgrofit extends Command
                 'scientific_name' => $pragueName,
             ]);
             $prague->save();
-            
+
             $productPrague = ProductPrague::firstOrNew([
                 'product_id' => $product->id,
                 'prague_id'  => $prague->id,
             ]);
             $productPrague->save();
-            
+
             foreach (toArray($item[9]) as $value) {
-                
+
                 $value = preg_replace('/\s*\(\d+\)/', '', $value);
                 $value = str_replace("-", " ", $value);
+                $value = trim($value);
                 if ($value && !in_array($value, ["-", "--", ",", ",", "="])) {
-                    
+
                     $value = Str::title($value);
                     $value = str_replace("Acaro", "Ácaro", $value);
                     $value = str_replace("Àcaro", "Ácaro", $value);
-                    
+
                     $commonPrague = CommonPrague::firstOrNew([
                         'name' => $value,
                     ]);
                     $commonPrague->save();
-                    
+
                     $commomName = PragueCommonName::firstOrNew([
                         'prague_id' => $prague->id,
                         'common_prague_id' => $commonPrague->id,
