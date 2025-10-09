@@ -72,6 +72,8 @@ class Transfer extends Command
         ToxicologicalClass::query()->forceDelete();
         RegistrationHolder::query()->forceDelete();
         Formulation::query()->forceDelete();
+
+        $this->info("dados apagados");
     }
 
     private function makeTransfer()
